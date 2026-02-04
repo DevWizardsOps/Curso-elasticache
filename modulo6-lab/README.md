@@ -39,12 +39,13 @@ modulo6-lab/
 
 ## 🚀 Pré-requisitos
 
-- Conta AWS ativa
-- AWS CLI configurado
+- Conta AWS ativa configurada para região **us-east-2**
+- AWS CLI configurado para região us-east-2
 - Acesso à instância EC2 fornecida pelo instrutor
 - Redis CLI / Valkey CLI instalado
 - RedisInsight configurado
 - Conhecimento básico de ElastiCache
+- **ID único de aluno** fornecido pelo instrutor
 
 ## 📚 Laboratórios
 
@@ -179,9 +180,14 @@ aws elasticache delete-cache-cluster --cache-cluster-id lab-cluster
 
 ## 📝 Notas
 
-- Todos os scripts assumem região `us-east-1` (pode ser alterado)
+- Todos os laboratórios são executados na região **us-east-2**
+- Cada aluno trabalha com recursos individuais identificados por ID único
+- VPC e Subnet Groups são compartilhados entre alunos
+- Security Groups e clusters são individuais por aluno
+- Foco em aprendizado hands-on via Console Web + CLI
 - Use sempre TLS em ambientes de produção
 - Monitore métricas durante os exercícios
+- Delete recursos ao final de cada laboratório para evitar custos
 
 ## 🎯 Síntese do Módulo
 

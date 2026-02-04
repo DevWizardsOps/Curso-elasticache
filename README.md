@@ -72,6 +72,7 @@ ssh -i nome-da-chave.pem alunoXX@SEU-IP-PUBLICO
 **Verificar configuração**:
 ```bash
 aws sts get-caller-identity  # Ver suas credenciais
+aws configure get region     # Deve retornar: us-east-2
 redis-cli --version          # Verificar Redis CLI
 labs                         # Ir para diretório de trabalho
 ```
