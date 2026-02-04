@@ -105,7 +105,7 @@ Este plano de implementação detalha as tarefas necessárias para criar o Módu
   - **Property 25: Integração de ferramentas específicas**
   - **Validates: Requirements 8.3**
 
-- [ ] 9. Implementar Lab 05 - RedisInsight
+- [x] 9. Implementar Lab 05 - RedisInsight
   - Criar README.md com configuração RedisInsight
   - Implementar scripts de configuração Bastion Host
   - Desenvolver exercícios de túnel SSH

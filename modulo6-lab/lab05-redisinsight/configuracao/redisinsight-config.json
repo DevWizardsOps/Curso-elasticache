@@ -1,0 +1,204 @@
+{
+  "name": "RedisInsight Configuration for ElastiCache Labs",
+  "version": "2.0",
+  "description": "Configurações de exemplo para conectar RedisInsight ao ElastiCache via túnel SSH",
+  
+  "connections": [
+    {
+      "id": "elasticache-lab-connection",
+      "name": "ElastiCache Lab - {SEU_ID}",
+      "connectionType": "standalone",
+      "host": "localhost",
+      "port": 6380,
+      "username": "",
+      "password": "",
+      "tls": false,
+      "ssh": false,
+      "timeout": 30000,
+      "description": "Conexão via túnel SSH para laboratório ElastiCache"
+    }
+  ],
+  
+  "settings": {
+    "theme": "dark",
+    "language": "en",
+    "analytics": false,
+    "notifications": true,
+    "autoRefresh": true,
+    "refreshInterval": 5000,
+    "maxKeysToDisplay": 1000,
+    "defaultTTL": 3600
+  },
+  
+  "profiler": {
+    "enabled": true,
+    "logSlowCommands": true,
+    "slowCommandThreshold": 10,
+    "maxLogEntries": 1000,
+    "autoStart": false
+  },
+  
+  "browser": {
+    "defaultPageSize": 50,
+    "maxValueLength": 1000,
+    "showMemoryUsage": true,
+    "showTTL": true,
+    "groupByPattern": true
+  },
+  
+  "workbench": {
+    "enableSyntaxHighlighting": true,
+    "enableAutoComplete": true,
+    "maxHistoryEntries": 100,
+    "defaultDatabase": 0
+  },
+  
+  "analysis": {
+    "autoAnalyze": false,
+    "maxKeysToAnalyze": 10000,
+    "sampleSize": 1000,
+    "showRecommendations": true
+  },
+  
+  "security": {
+    "requireAuth": false,
+    "sessionTimeout": 3600,
+    "maxConcurrentSessions": 5
+  },
+  
+  "performance": {
+    "connectionPoolSize": 10,
+    "commandTimeout": 5000,
+    "retryAttempts": 3,
+    "retryDelay": 1000
+  },
+  
+  "monitoring": {
+    "enableMetrics": true,
+    "metricsInterval": 10000,
+    "enableAlerts": false,
+    "alertThresholds": {
+      "memoryUsage": 80,
+      "cpuUsage": 80,
+      "connectionCount": 100
+    }
+  },
+  
+  "export": {
+    "defaultFormat": "json",
+    "includeMetadata": true,
+    "maxExportSize": "100MB"
+  },
+  
+  "import": {
+    "supportedFormats": ["json", "csv", "redis"],
+    "maxImportSize": "50MB",
+    "validateData": true
+  },
+  
+  "plugins": {
+    "enabled": [],
+    "autoUpdate": false
+  },
+  
+  "logging": {
+    "level": "info",
+    "maxLogSize": "10MB",
+    "logRotation": true
+  },
+  
+  "backup": {
+    "autoBackup": false,
+    "backupInterval": 86400,
+    "maxBackups": 7,
+    "backupLocation": "/tmp/redisinsight-backups"
+  },
+  
+  "examples": {
+    "sampleQueries": [
+      "INFO memory",
+      "DBSIZE",
+      "KEYS pattern:*",
+      "SCAN 0 MATCH pattern:* COUNT 100",
+      "MEMORY USAGE keyname",
+      "TTL keyname",
+      "TYPE keyname"
+    ],
+    
+    "commonPatterns": [
+      "user:*",
+      "session:*",
+      "cache:*",
+      "product:*",
+      "order:*",
+      "analytics:*"
+    ],
+    
+    "performanceQueries": [
+      "INFO commandstats",
+      "SLOWLOG GET 10",
+      "CLIENT LIST",
+      "MEMORY STATS",
+      "LATENCY LATEST"
+    ]
+  },
+  
+  "troubleshooting": {
+    "commonIssues": [
+      {
+        "issue": "Connection timeout",
+        "solutions": [
+          "Verify SSH tunnel is active",
+          "Check ElastiCache security groups",
+          "Validate network connectivity"
+        ]
+      },
+      {
+        "issue": "High memory usage",
+        "solutions": [
+          "Run MEMORY USAGE on large keys",
+          "Check for keys without TTL",
+          "Analyze memory fragmentation"
+        ]
+      },
+      {
+        "issue": "Slow queries",
+        "solutions": [
+          "Check SLOWLOG",
+          "Avoid KEYS command",
+          "Use SCAN for large datasets"
+        ]
+      }
+    ]
+  },
+  
+  "bestPractices": [
+    "Always use SSH tunnels for ElastiCache access",
+    "Set appropriate TTL for all keys",
+    "Use SCAN instead of KEYS in production",
+    "Monitor memory usage regularly",
+    "Enable slow log for performance analysis",
+    "Use connection pooling in applications",
+    "Implement retry logic for resilience",
+    "Regular backup of important data",
+    "Monitor and alert on key metrics",
+    "Document connection procedures"
+  ],
+  
+  "labSpecific": {
+    "region": "us-east-2",
+    "studentIdPattern": "aluno[0-9]{2}",
+    "clusterNaming": "lab-insight-{studentId}",
+    "securityGroupNaming": "elasticache-lab-sg-{studentId}",
+    "tunnelPort": 6380,
+    "bastionUser": "ec2-user",
+    "keyPatterns": [
+      "product:{studentId}:*",
+      "user:{studentId}:*",
+      "cart:{studentId}:*",
+      "session:{studentId}:*",
+      "cache:{studentId}:*",
+      "analytics:{studentId}:*"
+    ]
+  }
+}
