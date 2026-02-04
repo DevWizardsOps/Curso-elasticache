@@ -75,7 +75,7 @@ Este plano de implementação detalha as tarefas necessárias para criar o Módu
   - **Property 18: Lab 02 - Simulação de Failover**
   - **Validates: Requirements 5.2**
 
-- [ ] 7. Implementar Lab 03 - Troubleshooting de Infraestrutura
+- [x] 7. Implementar Lab 03 - Troubleshooting de Infraestrutura
   - Criar README.md com cenários de problemas
   - Implementar scripts de diagnóstico de CPU e memória
   - Desenvolver exercícios de análise de métricas CloudWatch
