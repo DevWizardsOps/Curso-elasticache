@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lab 01 - Cluster ElastiCache Redis (Cluster Mode Enabled)'
+
+Parameters:
+  SubnetGroupName:
+    Type: String
+    Description: ElastiCache Subnet Group Name
+    Default: elasticache-lab-subnet-group
+
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security Group ID for ElastiCache cluster
+
+  NodeType:
+    Type: String
+    Default: cache.t3.micro
+    Description: ElastiCache node type (Free Tier eligible)
+    AllowedValues:
+      - cache.t3.micro
+      - cache.t3.small
+      - cache.t3.medium
+
+  NumNodeGroups:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 90
+    Description: Number of node groups (shards)
+
+  ReplicasPerNodeGroup:
+    Type: Number
+    Default: 1
+    MinValue: 0
+    MaxValue: 5
+    Description: Number of replica nodes per shard
+
+  EngineVersion:
+    Type: String
+    Default: '7.0'
+    Description: Redis engine version
+    AllowedValues:
+      - '6.2'
+      - '7.0'
+
+Resources:
+  # Parameter Group para Cluster Mode Enabled
+  CacheParameterGroup:
+    Type: AWS::ElastiCache::ParameterGroup
+    Properties:
+      CacheParameterGroupFamily: redis7.x
+      Description: Parameter group for Lab 01 Redis cluster (enabled mode)
+      Properties:
+        maxmemory-policy: allkeys-lru
+        timeout: 300
+        cluster-enabled: 'yes'
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab01-Enabled-PG
+        - Key: Lab
+          Value: Lab01
+
+  # Replication Group (Cluster Mode Enabled)
+  ElastiCacheReplicationGroup:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      ReplicationGroupId: lab-cluster-enabled
+      Description: Lab 01 Redis cluster with Cluster Mode Enabled
+      NodeType: !Ref NodeType
+      Engine: redis
+      EngineVersion: !Ref EngineVersion
+      CacheParameterGroupName: !Ref CacheParameterGroup
+      CacheSubnetGroupName: !Ref SubnetGroupName
+      SecurityGroupIds:
+        - !Ref SecurityGroupId
+      Port: 6379
+      
+      # Cluster Mode Enabled specific settings
+      NumNodeGroups: !Ref NumNodeGroups
+      ReplicasPerNodeGroup: !Ref ReplicasPerNodeGroup
+      
+      # Maintenance and backup settings
+      PreferredMaintenanceWindow: sun:03:00-sun:04:00
+      SnapshotRetentionLimit: 1
+      SnapshotWindow: 01:00-02:00
+      
+      # Multi-AZ for high availability
+      MultiAZEnabled: true
+      AutomaticFailoverEnabled: true
+      
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab01-Cluster-Enabled
+        - Key: Lab
+          Value: Lab01
+        - Key: Mode
+          Value: Cluster-Enabled
+        - Key: Purpose
+          Value: Learning-Architecture
+
+Outputs:
+  ReplicationGroupId:
+    Description: ElastiCache Replication Group ID
+    Value: !Ref ElastiCacheReplicationGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-Replication-Group-ID'
+
+  ConfigurationEndpoint:
+    Description: Configuration Endpoint for Cluster Mode Enabled
+    Value: !GetAtt ElastiCacheReplicationGroup.ConfigurationEndPoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}-Configuration-Endpoint'
+
+  ConfigurationPort:
+    Description: Configuration Endpoint Port
+    Value: !GetAtt ElastiCacheReplicationGroup.ConfigurationEndPoint.Port
+    Export:
+      Name: !Sub '${AWS::StackName}-Configuration-Port'
+
+  ClusterMode:
+    Description: Cluster Mode
+    Value: Enabled
+    Export:
+      Name: !Sub '${AWS::StackName}-Cluster-Mode'
+
+  NodeType:
+    Description: Node Type Used
+    Value: !Ref NodeType
+    Export:
+      Name: !Sub '${AWS::StackName}-Node-Type'
+
+  NumNodeGroups:
+    Description: Number of Node Groups (Shards)
+    Value: !Ref NumNodeGroups
+    Export:
+      Name: !Sub '${AWS::StackName}-Num-Node-Groups'
+
+  ReplicasPerNodeGroup:
+    Description: Replicas per Node Group
+    Value: !Ref ReplicasPerNodeGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-Replicas-Per-Node-Group'
+
+  TotalNodes:
+    Description: Total number of nodes in cluster
+    Value: !Sub 
+      - '${Total}'
+      - Total: !Ref NumNodeGroups
+    Export:
+      Name: !Sub '${AWS::StackName}-Total-Nodes'
+
+  ConnectionString:
+    Description: Redis Connection String (cluster mode)
+    Value: !Sub 
+      - 'redis-cli -h ${Endpoint} -p ${Port} -c'
+      - Endpoint: !GetAtt ElastiCacheReplicationGroup.ConfigurationEndPoint.Address
+        Port: !GetAtt ElastiCacheReplicationGroup.ConfigurationEndPoint.Port
+    Export:
+      Name: !Sub '${AWS::StackName}-Connection-String'
+
+  ClusterCharacteristics:
+    Description: Key characteristics of this cluster mode
+    Value: !Sub |
+      - Multiple shards (${NumNodeGroups} node groups)
+      - Automatic data distribution
+      - Horizontal scaling capability
+      - Configuration endpoint for discovery
+      - Automatic failover enabled
+      - Multi-AZ deployment
+      - Suitable for high-scale workloads

@@ -1,0 +1,133 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lab 01 - Cluster ElastiCache Redis (Cluster Mode Disabled)'
+
+Parameters:
+  SubnetGroupName:
+    Type: String
+    Description: ElastiCache Subnet Group Name
+    Default: elasticache-lab-subnet-group
+
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security Group ID for ElastiCache cluster
+
+  NodeType:
+    Type: String
+    Default: cache.t3.micro
+    Description: ElastiCache node type (Free Tier eligible)
+    AllowedValues:
+      - cache.t3.micro
+      - cache.t3.small
+      - cache.t3.medium
+
+  NumCacheNodes:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    MaxValue: 6
+    Description: Number of cache nodes (1 = no replicas, >1 = with replicas)
+
+  EngineVersion:
+    Type: String
+    Default: '7.0'
+    Description: Redis engine version
+    AllowedValues:
+      - '6.2'
+      - '7.0'
+
+Resources:
+  # Parameter Group para configurações customizadas
+  CacheParameterGroup:
+    Type: AWS::ElastiCache::ParameterGroup
+    Properties:
+      CacheParameterGroupFamily: redis7.x
+      Description: Parameter group for Lab 01 Redis cluster (disabled mode)
+      Properties:
+        maxmemory-policy: allkeys-lru
+        timeout: 300
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab01-Disabled-PG
+        - Key: Lab
+          Value: Lab01
+
+  # Cluster ElastiCache (Cluster Mode Disabled)
+  ElastiCacheCluster:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      CacheClusterId: lab-cluster-disabled
+      CacheNodeType: !Ref NodeType
+      Engine: redis
+      EngineVersion: !Ref EngineVersion
+      NumCacheNodes: !Ref NumCacheNodes
+      CacheParameterGroupName: !Ref CacheParameterGroup
+      CacheSubnetGroupName: !Ref SubnetGroupName
+      VpcSecurityGroupIds:
+        - !Ref SecurityGroupId
+      Port: 6379
+      PreferredMaintenanceWindow: sun:03:00-sun:04:00
+      PreferredAvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab01-Cluster-Disabled
+        - Key: Lab
+          Value: Lab01
+        - Key: Mode
+          Value: Cluster-Disabled
+        - Key: Purpose
+          Value: Learning-Architecture
+
+Outputs:
+  ClusterId:
+    Description: ElastiCache Cluster ID
+    Value: !Ref ElastiCacheCluster
+    Export:
+      Name: !Sub '${AWS::StackName}-Cluster-ID'
+
+  ClusterEndpoint:
+    Description: ElastiCache Cluster Endpoint
+    Value: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}-Cluster-Endpoint'
+
+  ClusterPort:
+    Description: ElastiCache Cluster Port
+    Value: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
+    Export:
+      Name: !Sub '${AWS::StackName}-Cluster-Port'
+
+  ClusterMode:
+    Description: Cluster Mode
+    Value: Disabled
+    Export:
+      Name: !Sub '${AWS::StackName}-Cluster-Mode'
+
+  NodeType:
+    Description: Node Type Used
+    Value: !Ref NodeType
+    Export:
+      Name: !Sub '${AWS::StackName}-Node-Type'
+
+  NumNodes:
+    Description: Number of Cache Nodes
+    Value: !Ref NumCacheNodes
+    Export:
+      Name: !Sub '${AWS::StackName}-Num-Nodes'
+
+  ConnectionString:
+    Description: Redis Connection String
+    Value: !Sub 
+      - 'redis-cli -h ${Endpoint} -p ${Port}'
+      - Endpoint: !GetAtt ElastiCacheCluster.RedisEndpoint.Address
+        Port: !GetAtt ElastiCacheCluster.RedisEndpoint.Port
+    Export:
+      Name: !Sub '${AWS::StackName}-Connection-String'
+
+  ClusterCharacteristics:
+    Description: Key characteristics of this cluster mode
+    Value: |
+      - Single primary node
+      - Simple endpoint structure
+      - Vertical scaling only
+      - No automatic data distribution
+      - Suitable for moderate workloads

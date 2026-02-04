@@ -1,0 +1,154 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lab 01 - Infraestrutura VPC para ElastiCache'
+
+Parameters:
+  VPCCidr:
+    Type: String
+    Default: '10.0.0.0/16'
+    Description: CIDR block for VPC
+  
+  PrivateSubnet1Cidr:
+    Type: String
+    Default: '10.0.1.0/24'
+    Description: CIDR block for private subnet 1
+  
+  PrivateSubnet2Cidr:
+    Type: String
+    Default: '10.0.2.0/24'
+    Description: CIDR block for private subnet 2
+
+Resources:
+  # VPC
+  ElastiCacheVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-VPC
+        - Key: Lab
+          Value: Lab01
+        - Key: Purpose
+          Value: ElastiCache-Learning
+
+  # Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-IGW
+        - Key: Lab
+          Value: Lab01
+
+  # Attach Internet Gateway to VPC
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref ElastiCacheVPC
+
+  # Private Subnet 1 (AZ a)
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref ElastiCacheVPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Ref PrivateSubnet1Cidr
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Private-Subnet-1
+        - Key: Lab
+          Value: Lab01
+        - Key: Type
+          Value: Private
+
+  # Private Subnet 2 (AZ b)
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref ElastiCacheVPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Ref PrivateSubnet2Cidr
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Private-Subnet-2
+        - Key: Lab
+          Value: Lab01
+        - Key: Type
+          Value: Private
+
+  # Route Table for Private Subnets
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref ElastiCacheVPC
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Private-RT
+        - Key: Lab
+          Value: Lab01
+
+  # Associate Private Subnet 1 with Route Table
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet1
+
+  # Associate Private Subnet 2 with Route Table
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet2
+
+  # ElastiCache Subnet Group
+  ElastiCacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      CacheSubnetGroupName: elasticache-lab-subnet-group
+      Description: Subnet group for ElastiCache Lab 01
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Subnet-Group
+        - Key: Lab
+          Value: Lab01
+
+Outputs:
+  VPCId:
+    Description: VPC ID
+    Value: !Ref ElastiCacheVPC
+    Export:
+      Name: !Sub '${AWS::StackName}-VPC-ID'
+
+  PrivateSubnet1Id:
+    Description: Private Subnet 1 ID
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub '${AWS::StackName}-Private-Subnet-1-ID'
+
+  PrivateSubnet2Id:
+    Description: Private Subnet 2 ID
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: !Sub '${AWS::StackName}-Private-Subnet-2-ID'
+
+  SubnetGroupName:
+    Description: ElastiCache Subnet Group Name
+    Value: !Ref ElastiCacheSubnetGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-Subnet-Group-Name'
+
+  VPCCidr:
+    Description: VPC CIDR Block
+    Value: !Ref VPCCidr
+    Export:
+      Name: !Sub '${AWS::StackName}-VPC-CIDR'
