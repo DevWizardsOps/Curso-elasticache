@@ -90,7 +90,7 @@ Este plano de implementação detalha as tarefas necessárias para criar o Módu
   - **Property 23: Simulações de falha**
   - **Validates: Requirements 8.1**
 
-- [ ] 8. Implementar Lab 04 - Troubleshooting de Dados
+- [x] 8. Implementar Lab 04 - Troubleshooting de Dados
   - Criar README.md com problemas de dados
   - Implementar scripts para identificar big keys
   - Desenvolver ferramentas para detectar hot keys
