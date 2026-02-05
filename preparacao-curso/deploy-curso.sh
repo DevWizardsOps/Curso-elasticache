@@ -446,15 +446,43 @@ fi
 
 echo "✅ Subnet pública encontrada: $SUBNET_ID"
 
-# Verificar se script existe localmente (para referência)
+# Verificar se script existe localmente
 echo ""
 echo "📋 Verificando script de setup..."
-if [ -f "setup-aluno.sh" ]; then
-    echo "✅ Script de setup encontrado localmente: setup-aluno.sh"
-    echo "💡 O script será baixado diretamente do GitHub durante o boot das instâncias"
+if [ ! -f "setup-aluno.sh" ]; then
+    echo "❌ Erro: Arquivo setup-aluno.sh não encontrado!"
+    exit 1
+fi
+echo "✅ Script de setup encontrado: setup-aluno.sh"
+
+# Criar bucket S3 para labs se não existir (ANTES da stack)
+echo ""
+echo "🪣 Preparando bucket S3..."
+if ! aws_cmd s3 ls "s3://${LABS_BUCKET}" --region "$REGION" >/dev/null 2>&1; then
+    echo "🪣 Criando bucket S3: ${LABS_BUCKET}"
+    aws_cmd s3 mb "s3://${LABS_BUCKET}" --region "$REGION"
+    
+    # Configurar bloqueio de acesso público
+    aws_cmd s3api put-public-access-block \
+        --bucket "${LABS_BUCKET}" \
+        --public-access-block-configuration \
+        "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" \
+        --region "$REGION"
+    
+    echo "✅ Bucket criado: ${LABS_BUCKET}"
 else
-    echo "⚠️  Script setup-aluno.sh não encontrado localmente (não é crítico)"
-    echo "💡 O script será baixado diretamente do GitHub durante o boot das instâncias"
+    echo "✅ Bucket já existe: ${LABS_BUCKET}"
+fi
+
+# Upload do script de setup para o S3 (ANTES da stack)
+echo ""
+echo "📤 Fazendo upload do script de setup para o S3..."
+aws_cmd s3 cp setup-aluno.sh "s3://${LABS_BUCKET}/scripts/setup-aluno.sh" --region "$REGION"
+if [ $? -eq 0 ]; then
+    echo "✅ Script de setup enviado para S3"
+else
+    echo "❌ Erro ao enviar script para S3"
+    exit 1
 fi
 
 # Criar stack CloudFormation
@@ -600,7 +628,7 @@ if aws_cmd cloudformation wait stack-create-complete --stack-name "$STACK_NAME" 
             
             # Verificar logs do UserData (se possível)
             if [ "$INSTANCE_STATE" = "running" ]; then
-                echo "    ✅ Instância rodando - Setup automático do GitHub executado"
+                echo "    ✅ Instância rodando - Setup automático do S3 executado"
             fi
         fi
     done

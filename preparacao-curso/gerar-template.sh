@@ -214,88 +214,21 @@ for i in $(seq 1 "$NUM_ALUNOS"); do
         Fn::Base64: !Sub 
           - |
             #!/bin/bash
-            exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
-            echo "=== INICIANDO SETUP PARA ${ALUNO_ID} EM \$(date) ==="
-            
-            # Aguardar conectividade com internet
-            echo "Testando conectividade com internet..."
+            # Aguardar IAM instance profile estar disponível (máximo 30s)
             for i in {1..30}; do
-              if curl -s --connect-timeout 5 https://github.com >/dev/null; then
-                echo "✅ Internet acessível!"
+              if curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/ > /dev/null 2>&1; then
                 break
               fi
-              echo "⏳ Tentativa \$i/30: Aguardando conectividade..."
-              sleep 10
+              sleep 1
             done
             
-            # Baixar script de setup diretamente do GitHub
-            echo "📥 Baixando script de setup do GitHub..."
-            GITHUB_SCRIPT_URL="https://raw.githubusercontent.com/DevWizardsOps/Curso-elasticache/main/preparacao-curso/setup-aluno.sh"
-            
-            if curl -fsSL "\$GITHUB_SCRIPT_URL" -o /tmp/setup-aluno.sh; then
-              echo "✅ Script baixado com sucesso do GitHub"
-              chmod +x /tmp/setup-aluno.sh
-              
-              echo "🚀 Executando setup para ${ALUNO_ID}..."
-              /tmp/setup-aluno.sh "${ALUNO_ID}" "\${AWS::Region}" "\${AccessKey}" "\${SecretKey}" >> /var/log/setup-aluno.log 2>&1
-              SETUP_EXIT_CODE=\$?
-              echo "✅ Setup concluído com código: \$SETUP_EXIT_CODE"
-              
-              # Verificar se o usuário foi criado
-              if id "${ALUNO_ID}" &>/dev/null; then
-                echo "✅ Usuário ${ALUNO_ID} criado com sucesso"
-              else
-                echo "❌ Falha ao criar usuário ${ALUNO_ID}"
-                SETUP_EXIT_CODE=1
-              fi
-            else
-              echo "❌ Falha ao baixar script do GitHub"
-              SETUP_EXIT_CODE=1
-            fi
-            
-            # Se falhou, executar configuração básica de fallback
-            if [ \$SETUP_EXIT_CODE -ne 0 ]; then
-              echo "🔄 Executando configuração básica de fallback..."
-              yum update -y
-              yum install -y git htop tree wget unzip jq bc redis6 redis6-doc --skip-broken
-              curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - || true
-              yum install -y nodejs python3 python3-pip --skip-broken
-              
-              # Criar estrutura básica
-              mkdir -p /home/ec2-user/labs
-              echo "Ambiente básico configurado em \$(date)" > /home/ec2-user/labs/setup-status.txt
-              echo "ERRO: Setup completo falhou, usando configuração básica" >> /home/ec2-user/labs/setup-status.txt
-              chown -R ec2-user:ec2-user /home/ec2-user/labs
-              
-              # Tentar criar usuário básico
-              if ! id "${ALUNO_ID}" &>/dev/null; then
-                useradd -m -s /bin/bash ${ALUNO_ID} || true
-                echo "${ALUNO_ID} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers || true
-                
-                # Copiar chave SSH
-                if [ -d "/home/ec2-user/.ssh" ]; then
-                  mkdir -p /home/${ALUNO_ID}/.ssh
-                  cp /home/ec2-user/.ssh/authorized_keys /home/${ALUNO_ID}/.ssh/authorized_keys || true
-                  chown -R ${ALUNO_ID}:${ALUNO_ID} /home/${ALUNO_ID}/.ssh || true
-                  chmod 700 /home/${ALUNO_ID}/.ssh || true
-                  chmod 600 /home/${ALUNO_ID}/.ssh/authorized_keys || true
-                fi
-                
-                # Configurar variável ID básica
-                echo "export ID=${ALUNO_ID}" >> /home/${ALUNO_ID}/.bashrc || true
-                chown ${ALUNO_ID}:${ALUNO_ID} /home/${ALUNO_ID}/.bashrc || true
-              fi
-              
-              SETUP_EXIT_CODE=0  # Não falhar o CloudFormation por causa do fallback
-            fi
-            
-            echo "=== FINALIZANDO USER-DATA EM \$(date) ==="
-            echo "Código de saída final: \$SETUP_EXIT_CODE"
-            
-            # Sinalizar conclusão para CloudFormation
-            /opt/aws/bin/cfn-signal -e \$SETUP_EXIT_CODE --stack \${AWS::StackName} --resource ${ALUNO_ID_UPPER}Instance --region \${AWS::Region}
+            # Baixar e executar script de setup do S3
+            aws s3 cp s3://\${BucketName}/scripts/setup-aluno.sh /tmp/setup-aluno.sh --region \${AWS::Region}
+            chmod +x /tmp/setup-aluno.sh
+            /tmp/setup-aluno.sh "${ALUNO_ID}" "\${AWS::Region}" "\${AccessKey}" "\${SecretKey}" >> /var/log/setup-aluno.log 2>&1
           - AccessKey: !Ref ${ALUNO_ID_UPPER}AccessKey
             SecretKey: !GetAtt ${ALUNO_ID_UPPER}AccessKey.SecretAccessKey
+            BucketName: !Ref LabsBucket
       Tags:
         - Key: Name
           Value: curso-elasticache-${ALUNO_ID}

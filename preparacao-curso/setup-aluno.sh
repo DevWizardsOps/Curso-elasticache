@@ -16,7 +16,7 @@ echo "Iniciando setup para aluno: $ALUNO_ID na região: $AWS_REGION"
 # Atualizar sistema
 yum update -y
 
-# Instalar ferramentas básicas (evitar conflitos com curl)
+# Instalar ferramentas básicas
 yum install -y git htop tree wget unzip jq bc --skip-broken
 
 # Instalar Redis CLI (Amazon Linux 2023)
@@ -36,18 +36,12 @@ else
     echo "✅ Usuário ${ALUNO_ID} já existe"
 fi
 
-# Copiar chave SSH do ec2-user para o aluno (se não existir)
-if [ ! -d "/home/${ALUNO_ID}/.ssh" ]; then
-    echo "Configurando SSH para ${ALUNO_ID}..."
-    mkdir -p /home/${ALUNO_ID}/.ssh
-    cp /home/ec2-user/.ssh/authorized_keys /home/${ALUNO_ID}/.ssh/authorized_keys
-    chown -R ${ALUNO_ID}:${ALUNO_ID} /home/${ALUNO_ID}/.ssh
-    chmod 700 /home/${ALUNO_ID}/.ssh
-    chmod 600 /home/${ALUNO_ID}/.ssh/authorized_keys
-    echo "✅ SSH configurado para ${ALUNO_ID}"
-else
-    echo "✅ SSH já configurado para ${ALUNO_ID}"
-fi
+# Copiar chave SSH do ec2-user para o aluno
+mkdir -p /home/${ALUNO_ID}/.ssh
+cp /home/ec2-user/.ssh/authorized_keys /home/${ALUNO_ID}/.ssh/authorized_keys
+chown -R ${ALUNO_ID}:${ALUNO_ID} /home/${ALUNO_ID}/.ssh
+chmod 700 /home/${ALUNO_ID}/.ssh
+chmod 600 /home/${ALUNO_ID}/.ssh/authorized_keys
 
 # Configurar AWS CLI para o aluno
 sudo -u ${ALUNO_ID} aws configure set aws_access_key_id ${ACCESS_KEY}
@@ -61,16 +55,10 @@ sudo -u ec2-user aws configure set aws_secret_access_key "$SECRET_KEY"
 sudo -u ec2-user aws configure set default.region "$AWS_REGION"
 sudo -u ec2-user aws configure set default.output json
 
-# Clonar repositório do curso (se não existir)
+# Clonar repositório do curso
 cd /home/${ALUNO_ID}
-if [ ! -d "Curso-elasticache" ]; then
-    echo "Clonando repositório do curso..."
-    sudo -u ${ALUNO_ID} git clone https://github.com/DevWizardsOps/Curso-elasticache.git
-    sudo -u ${ALUNO_ID} rm -fr /home/${ALUNO_ID}/Curso-elasticache/preparacao-curso* 2>/dev/null || true
-    echo "✅ Repositório clonado"
-else
-    echo "✅ Repositório já existe"
-fi
+sudo -u ${ALUNO_ID} git clone https://github.com/DevWizardsOps/Curso-elasticache.git
+sudo -u ${ALUNO_ID} rm -fr /home/${ALUNO_ID}/Curso-elasticache/preparacao-curso* 2>/dev/null || true
 
 # Instalar dependências Python
 sudo -u ${ALUNO_ID} pip3 install --user boto3 redis
@@ -117,10 +105,8 @@ EOFWELCOME
 sed -i "s/ALUNO_PLACEHOLDER/${ALUNO_ID}/g" /home/${ALUNO_ID}/BEM-VINDO.txt
 sed -i "s/REGION_PLACEHOLDER/${AWS_REGION}/g" /home/${ALUNO_ID}/BEM-VINDO.txt
 
-# Adicionar customizações ao .bashrc (se não existirem)
-if ! grep -q "export ID=${ALUNO_ID}" /home/${ALUNO_ID}/.bashrc; then
-    echo "Configurando .bashrc para ${ALUNO_ID}..."
-    cat >> /home/${ALUNO_ID}/.bashrc << EOFBASHRC
+# Adicionar customizações ao .bashrc
+cat >> /home/${ALUNO_ID}/.bashrc << 'EOFBASHRC'
 
 # Aliases úteis
 alias ll='ls -lah'
@@ -145,16 +131,10 @@ if [ -f ~/BEM-VINDO.txt ] && [ ! -f ~/.welcome_shown ]; then
     touch ~/.welcome_shown
 fi
 
-# Definir variável ID do aluno
-export ID=${ALUNO_ID}
-
-# Adicionar ao PATH se necessário
-export PATH=\$PATH:~/.local/bin
+export ID=ALUNO_ID_PLACEHOLDER
 EOFBASHRC
-    echo "✅ .bashrc configurado"
-else
-    echo "✅ .bashrc já configurado"
-fi
+
+sed -i "s/ALUNO_ID_PLACEHOLDER/${ALUNO_ID}/g" /home/${ALUNO_ID}/.bashrc
 
 # Criar diretório de labs compatível (link simbólico)
 mkdir -p /home/ec2-user/labs
@@ -173,3 +153,5 @@ echo "Setup completo para $ALUNO_ID em $(date)" > /home/ec2-user/labs/setup-stat
 chown ec2-user:ec2-user /home/ec2-user/labs/setup-status.txt
 
 echo "Setup concluído com sucesso para $ALUNO_ID"
+
+exit 0
