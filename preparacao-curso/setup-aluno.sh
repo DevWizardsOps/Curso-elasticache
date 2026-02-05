@@ -26,16 +26,28 @@ yum install -y redis6 redis6-doc
 curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
 yum install -y nodejs python3 python3-pip
 
-# Criar usuário do aluno
-useradd -m -s /bin/bash ${ALUNO_ID}
-echo "${ALUNO_ID} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# Criar usuário do aluno (se não existir)
+if ! id ${ALUNO_ID} &>/dev/null; then
+    echo "Criando usuário ${ALUNO_ID}..."
+    useradd -m -s /bin/bash ${ALUNO_ID}
+    echo "${ALUNO_ID} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+    echo "✅ Usuário ${ALUNO_ID} criado"
+else
+    echo "✅ Usuário ${ALUNO_ID} já existe"
+fi
 
-# Copiar chave SSH do ec2-user para o aluno
-mkdir -p /home/${ALUNO_ID}/.ssh
-cp /home/ec2-user/.ssh/authorized_keys /home/${ALUNO_ID}/.ssh/authorized_keys
-chown -R ${ALUNO_ID}:${ALUNO_ID} /home/${ALUNO_ID}/.ssh
-chmod 700 /home/${ALUNO_ID}/.ssh
-chmod 600 /home/${ALUNO_ID}/.ssh/authorized_keys
+# Copiar chave SSH do ec2-user para o aluno (se não existir)
+if [ ! -d "/home/${ALUNO_ID}/.ssh" ]; then
+    echo "Configurando SSH para ${ALUNO_ID}..."
+    mkdir -p /home/${ALUNO_ID}/.ssh
+    cp /home/ec2-user/.ssh/authorized_keys /home/${ALUNO_ID}/.ssh/authorized_keys
+    chown -R ${ALUNO_ID}:${ALUNO_ID} /home/${ALUNO_ID}/.ssh
+    chmod 700 /home/${ALUNO_ID}/.ssh
+    chmod 600 /home/${ALUNO_ID}/.ssh/authorized_keys
+    echo "✅ SSH configurado para ${ALUNO_ID}"
+else
+    echo "✅ SSH já configurado para ${ALUNO_ID}"
+fi
 
 # Configurar AWS CLI para o aluno
 sudo -u ${ALUNO_ID} aws configure set aws_access_key_id ${ACCESS_KEY}
@@ -49,10 +61,16 @@ sudo -u ec2-user aws configure set aws_secret_access_key "$SECRET_KEY"
 sudo -u ec2-user aws configure set default.region "$AWS_REGION"
 sudo -u ec2-user aws configure set default.output json
 
-# Clonar repositório do curso
+# Clonar repositório do curso (se não existir)
 cd /home/${ALUNO_ID}
-sudo -u ${ALUNO_ID} git clone https://github.com/DevWizardsOps/Curso-elasticache.git
-sudo -u ${ALUNO_ID} rm -fr /home/${ALUNO_ID}/Curso-elasticache/preparacao-curso* 2>/dev/null || true
+if [ ! -d "Curso-elasticache" ]; then
+    echo "Clonando repositório do curso..."
+    sudo -u ${ALUNO_ID} git clone https://github.com/DevWizardsOps/Curso-elasticache.git
+    sudo -u ${ALUNO_ID} rm -fr /home/${ALUNO_ID}/Curso-elasticache/preparacao-curso* 2>/dev/null || true
+    echo "✅ Repositório clonado"
+else
+    echo "✅ Repositório já existe"
+fi
 
 # Instalar dependências Python
 sudo -u ${ALUNO_ID} pip3 install --user boto3 redis
@@ -99,8 +117,10 @@ EOFWELCOME
 sed -i "s/ALUNO_PLACEHOLDER/${ALUNO_ID}/g" /home/${ALUNO_ID}/BEM-VINDO.txt
 sed -i "s/REGION_PLACEHOLDER/${AWS_REGION}/g" /home/${ALUNO_ID}/BEM-VINDO.txt
 
-# Adicionar customizações ao .bashrc
-cat >> /home/${ALUNO_ID}/.bashrc << EOFBASHRC
+# Adicionar customizações ao .bashrc (se não existirem)
+if ! grep -q "export ID=${ALUNO_ID}" /home/${ALUNO_ID}/.bashrc; then
+    echo "Configurando .bashrc para ${ALUNO_ID}..."
+    cat >> /home/${ALUNO_ID}/.bashrc << EOFBASHRC
 
 # Aliases úteis
 alias ll='ls -lah'
@@ -131,6 +151,10 @@ export ID=${ALUNO_ID}
 # Adicionar ao PATH se necessário
 export PATH=\$PATH:~/.local/bin
 EOFBASHRC
+    echo "✅ .bashrc configurado"
+else
+    echo "✅ .bashrc já configurado"
+fi
 
 # Criar diretório de labs compatível (link simbólico)
 mkdir -p /home/ec2-user/labs

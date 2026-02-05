@@ -1,0 +1,24 @@
+# Chaves SSH privadas
+*.pem
+*.key
+
+# Arquivos temporários do curso
+preparacao-curso/setup-curso-elasticache-dynamic.yaml
+preparacao-curso/alunos-ips.txt
+preparacao-curso/.ssh-key-info
+preparacao-curso/curso-elasticache-info-*.html
+
+# Logs
+*.log
+
+# Arquivos temporários do sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos de configuração local
+.env
+.env.local
+
+# Diretórios temporários
+tmp/
+temp/
