@@ -455,36 +455,6 @@ if [ ! -f "setup-aluno.sh" ]; then
 fi
 echo "✅ Script de setup encontrado: setup-aluno.sh"
 
-# Criar bucket S3 para labs se não existir (ANTES da stack)
-echo ""
-echo "🪣 Preparando bucket S3..."
-if ! aws_cmd s3 ls "s3://${LABS_BUCKET}" --region "$REGION" >/dev/null 2>&1; then
-    echo "🪣 Criando bucket S3: ${LABS_BUCKET}"
-    aws_cmd s3 mb "s3://${LABS_BUCKET}" --region "$REGION"
-    
-    # Configurar bloqueio de acesso público
-    aws_cmd s3api put-public-access-block \
-        --bucket "${LABS_BUCKET}" \
-        --public-access-block-configuration \
-        "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" \
-        --region "$REGION"
-    
-    echo "✅ Bucket criado: ${LABS_BUCKET}"
-else
-    echo "✅ Bucket já existe: ${LABS_BUCKET}"
-fi
-
-# Upload do script de setup para o S3 (ANTES da stack)
-echo ""
-echo "📤 Fazendo upload do script de setup para o S3..."
-aws_cmd s3 cp setup-aluno.sh "s3://${LABS_BUCKET}/scripts/setup-aluno.sh" --region "$REGION"
-if [ $? -eq 0 ]; then
-    echo "✅ Script de setup enviado para S3"
-else
-    echo "❌ Erro ao enviar script para S3"
-    exit 1
-fi
-
 # Criar stack CloudFormation
 echo ""
 echo "📋 Criando stack CloudFormation..."
@@ -596,6 +566,17 @@ fi
 echo "⏳ Aguardando criação da stack..."
 if aws_cmd cloudformation wait stack-create-complete --stack-name "$STACK_NAME" --region "$REGION"; then
     echo "✅ Stack criada com sucesso!"
+    
+    # Fazer upload do script para o bucket criado pela stack
+    echo ""
+    echo "📤 Fazendo upload do script de setup para o bucket criado..."
+    aws_cmd s3 cp setup-aluno.sh "s3://${LABS_BUCKET}/scripts/setup-aluno.sh" --region "$REGION"
+    if [ $? -eq 0 ]; then
+        echo "✅ Script de setup enviado para S3"
+    else
+        echo "❌ Erro ao enviar script para S3"
+        echo "⚠️  As instâncias podem não ter o setup completo"
+    fi
     
     # Aguardar um pouco para as instâncias processarem o UserData
     echo "⏳ Aguardando instâncias processarem o setup (90 segundos)..."
