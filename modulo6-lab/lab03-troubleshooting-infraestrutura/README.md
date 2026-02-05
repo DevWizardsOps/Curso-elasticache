@@ -48,8 +48,8 @@ lab03-troubleshooting-infraestrutura/
 ## 🏷️ Convenção de Nomenclatura
 
 Todos os recursos criados devem seguir o padrão:
-- **Cluster de Teste:** `lab-troubleshoot-{SEU_ID}`
-- **Security Groups:** Reutilizar `elasticache-lab-sg-{SEU_ID}` dos labs anteriores
+- **Cluster de Teste:** `lab-troubleshoot-$ID`
+- **Security Groups:** Reutilizar `elasticache-lab-sg-$ID` dos labs anteriores
 
 **Exemplo para aluno01:**
 - Cluster: `lab-troubleshoot-aluno01`
@@ -65,14 +65,14 @@ Todos os recursos criados devem seguir o padrão:
 
 ```bash
 # Definir seu ID (ALTERE AQUI)
-SEU_ID="aluno01"
+ID="aluno01"
 
 # Verificar região
 aws configure get region
 # Deve retornar: us-east-2
 
 # Verificar Security Group dos labs anteriores
-aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$SEU_ID" --region us-east-2
+aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --region us-east-2
 ```
 
 #### Passo 2: Criar Cluster de Teste via Console Web
@@ -82,8 +82,8 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
 3. Configure:
    - **Cluster mode:** Disabled (para simplicidade)
    - **Cluster info:**
-     - **Name:** `lab-troubleshoot-{SEU_ID}`
-     - **Description:** `Lab troubleshooting cluster for {SEU_ID}`
+     - **Name:** `lab-troubleshoot-$ID`
+     - **Description:** `Lab troubleshooting cluster for $ID`
    - **Location:**
      - **AWS Cloud**
      - **Multi-AZ:** Disabled (para este lab)
@@ -95,7 +95,7 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
    - **Connectivity:**
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
-     - **Security groups:** Selecione seu SG `elasticache-lab-sg-{SEU_ID}`
+     - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
    - **Advanced settings:**
      - **Parameter group:** default.redis7.x
      - **Log delivery:** Disabled (para este lab)
@@ -106,14 +106,14 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
 
 ```bash
 # Monitorar status do cluster
-watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$SEU_ID --query 'CacheClusters[0].CacheClusterStatus' --output text --region us-east-2"
+watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$ID --query 'CacheClusters[0].CacheClusterStatus' --output text --region us-east-2"
 
 # Quando disponível, obter endpoint
-CLUSTER_ENDPOINT=$(aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$SEU_ID --show-cache-node-info --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text --region us-east-2)
+CLUSTER_ENDPOINT=$(aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$ID --show-cache-node-info --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text --region us-east-2)
 echo "Cluster Endpoint: $CLUSTER_ENDPOINT"
 
 # Obter informações detalhadas
-aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$SEU_ID --show-cache-node-info --region us-east-2
+aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$ID --show-cache-node-info --region us-east-2
 ```
 
 **✅ Checkpoint:** Cluster deve estar "available" e endpoint acessível.
@@ -159,7 +159,7 @@ ping -c 4 $CLUSTER_ENDPOINT
 
 **Via Console Web:**
 1. Acesse **EC2** > **Security Groups**
-2. Encontre seu SG `elasticache-lab-sg-{SEU_ID}`
+2. Encontre seu SG `elasticache-lab-sg-$ID`
 3. Verifique **Inbound rules**:
    - Deve ter regra para porta 6379
    - Source deve permitir acesso do Bastion Host
@@ -167,7 +167,7 @@ ping -c 4 $CLUSTER_ENDPOINT
 **Via CLI:**
 ```bash
 # Obter ID do Security Group
-SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$SEU_ID" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
+SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
 
 # Analisar regras de entrada
 echo "🔍 Analisando regras do Security Group..."
@@ -220,12 +220,12 @@ redis-cli -h $CLUSTER_ENDPOINT -p 6379 << EOF
 FLUSHALL
 
 # Inserir dados de baseline
-$(for i in {1..1000}; do echo "SET baseline:$SEU_ID:key$i value$i"; done)
+$(for i in {1..1000}; do echo "SET baseline:$ID:key$i value$i"; done)
 
 # Criar algumas estruturas mais complexas
-HSET user:$SEU_ID:profile name "João Silva" email "joao@example.com" age 30
-LPUSH events:$SEU_ID $(for i in {1..100}; do echo "event$i"; done)
-SADD tags:$SEU_ID $(for i in {1..50}; do echo "tag$i"; done)
+HSET user:$ID:profile name "João Silva" email "joao@example.com" age 30
+LPUSH events:$ID $(for i in {1..100}; do echo "event$i"; done)
+SADD tags:$ID $(for i in {1..50}; do echo "tag$i"; done)
 EOF
 
 echo "✅ Dados de baseline inseridos"
@@ -237,7 +237,7 @@ echo "✅ Dados de baseline inseridos"
 1. Acesse **CloudWatch** > **Metrics**
 2. Navegue para **AWS/ElastiCache**
 3. Selecione **CacheClusterId**
-4. Encontre seu cluster `lab-troubleshoot-{SEU_ID}`
+4. Encontre seu cluster `lab-troubleshoot-$ID`
 5. Selecione métricas:
    - `CPUUtilization`
    - `EngineCPUUtilization`
@@ -253,7 +253,7 @@ echo "📈 Obtendo métricas de CPU..."
 aws cloudwatch get-metric-statistics \
     --namespace AWS/ElastiCache \
     --metric-name CPUUtilization \
-    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$SEU_ID \
+    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
@@ -264,7 +264,7 @@ aws cloudwatch get-metric-statistics \
 aws cloudwatch get-metric-statistics \
     --namespace AWS/ElastiCache \
     --metric-name EngineCPUUtilization \
-    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$SEU_ID \
+    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
@@ -289,18 +289,18 @@ generate_cpu_load() {
         # Operações que consomem CPU
         redis-cli -h $CLUSTER_ENDPOINT -p 6379 << EOF > /dev/null
         # Operações de busca complexas
-        KEYS *$SEU_ID*
+        KEYS *$ID*
         
         # Operações de ordenação
-        SORT events:$SEU_ID ALPHA
+        SORT events:$ID ALPHA
         
         # Operações de interseção de conjuntos
-        SINTER tags:$SEU_ID tags:$SEU_ID
+        SINTER tags:$ID tags:$ID
         
         # Operações de contagem
-        SCARD tags:$SEU_ID
-        LLEN events:$SEU_ID
-        HLEN user:$SEU_ID:profile
+        SCARD tags:$ID
+        LLEN events:$ID
+        HLEN user:$ID:profile
 EOF
     done
 }
@@ -322,7 +322,7 @@ for i in {1..6}; do
     
     # Testar operação simples
     START_TIME=$(date +%s%N)
-    redis-cli -h $CLUSTER_ENDPOINT -p 6379 GET baseline:$SEU_ID:key1 > /dev/null
+    redis-cli -h $CLUSTER_ENDPOINT -p 6379 GET baseline:$ID:key1 > /dev/null
     END_TIME=$(date +%s%N)
     LATENCY=$(( (END_TIME - START_TIME) / 1000000 ))
     echo "Latência GET: ${LATENCY}ms"
@@ -348,7 +348,7 @@ sleep 60
 aws cloudwatch get-metric-statistics \
     --namespace AWS/ElastiCache \
     --metric-name CPUUtilization \
-    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$SEU_ID \
+    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID \
     --start-time $(date -u -d '10 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 60 \
@@ -399,7 +399,7 @@ EOF
 aws cloudwatch get-metric-statistics \
     --namespace AWS/ElastiCache \
     --metric-name DatabaseMemoryUsagePercentage \
-    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$SEU_ID \
+    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
@@ -410,7 +410,7 @@ aws cloudwatch get-metric-statistics \
 aws cloudwatch get-metric-statistics \
     --namespace AWS/ElastiCache \
     --metric-name SwapUsage \
-    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$SEU_ID \
+    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
@@ -435,7 +435,7 @@ consume_memory() {
     for i in $(seq 1 $num_keys); do
         # Criar string de 1KB
         local value=$(printf 'A%.0s' {1..1024})
-        redis-cli -h $CLUSTER_ENDPOINT -p 6379 SET "memory_test:$SEU_ID:$i" "$value" > /dev/null
+        redis-cli -h $CLUSTER_ENDPOINT -p 6379 SET "memory_test:$ID:$i" "$value" > /dev/null
         
         # Mostrar progresso a cada 1000 chaves
         if [ $((i % 1000)) -eq 0 ]; then
@@ -461,7 +461,7 @@ for i in {1..5}; do
     
     # Testar performance com alta utilização de memória
     START_TIME=$(date +%s%N)
-    redis-cli -h $CLUSTER_ENDPOINT -p 6379 GET baseline:$SEU_ID:key1 > /dev/null
+    redis-cli -h $CLUSTER_ENDPOINT -p 6379 GET baseline:$ID:key1 > /dev/null
     END_TIME=$(date +%s%N)
     LATENCY=$(( (END_TIME - START_TIME) / 1000000 ))
     echo "Latência GET: ${LATENCY}ms"
@@ -472,7 +472,7 @@ done
 # Limpar dados de teste de memória
 echo "🧹 Limpando dados de teste..."
 redis-cli -h $CLUSTER_ENDPOINT -p 6379 eval "
-    local keys = redis.call('keys', 'memory_test:$SEU_ID:*')
+    local keys = redis.call('keys', 'memory_test:$ID:*')
     for i=1,#keys do
         redis.call('del', keys[i])
     end
@@ -580,7 +580,7 @@ redis-cli -h $CLUSTER_ENDPOINT -p 6379 config get maxmemory*
 ```bash
 # Exemplo de criação de alarme via CLI
 aws cloudwatch put-metric-alarm \
-    --alarm-name "ElastiCache-HighCPU-$SEU_ID" \
+    --alarm-name "ElastiCache-HighCPU-$ID" \
     --alarm-description "High CPU utilization on ElastiCache cluster" \
     --metric-name CPUUtilization \
     --namespace AWS/ElastiCache \
@@ -589,7 +589,7 @@ aws cloudwatch put-metric-alarm \
     --threshold 80 \
     --comparison-operator GreaterThanThreshold \
     --evaluation-periods 2 \
-    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$SEU_ID \
+    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID \
     --region us-east-2
 ```
 
@@ -609,20 +609,20 @@ aws cloudwatch put-metric-alarm \
 
 ### Via Console Web:
 1. **ElastiCache** > **Redis clusters**
-   - Selecione `lab-troubleshoot-{SEU_ID}`
+   - Selecione `lab-troubleshoot-$ID`
    - **Actions** > **Delete**
    - Confirme a deleção
 
 ### Via CLI:
 ```bash
 # Deletar cluster de troubleshooting
-aws elasticache delete-cache-cluster --cache-cluster-id lab-troubleshoot-$SEU_ID --region us-east-2
+aws elasticache delete-cache-cluster --cache-cluster-id lab-troubleshoot-$ID --region us-east-2
 
 # Monitorar deleção
-watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$SEU_ID --region us-east-2 2>/dev/null || echo 'Cluster deletado com sucesso'"
+watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$ID --region us-east-2 2>/dev/null || echo 'Cluster deletado com sucesso'"
 
 # Deletar alarmes criados (opcional)
-aws cloudwatch delete-alarms --alarm-names "ElastiCache-HighCPU-$SEU_ID" --region us-east-2
+aws cloudwatch delete-alarms --alarm-names "ElastiCache-HighCPU-$ID" --region us-east-2
 ```
 
 **NOTA:** Mantenha o Security Group para uso nos próximos laboratórios.

@@ -2,23 +2,23 @@
 
 # Script de referência para limpeza do Lab 03
 # Região: us-east-2
-# Uso: ./cleanup-lab03.sh <SEU_ID>
+# Uso: ./cleanup-lab03.sh <ID>
 
 set -e
 
 # Verificar parâmetros
 if [ $# -ne 1 ]; then
-    echo "Uso: $0 <SEU_ID>"
+    echo "Uso: $0 <ID>"
     echo "Exemplo: $0 aluno01"
     exit 1
 fi
 
-SEU_ID=$1
+ID=$1
 REGION="us-east-2"
-CLUSTER_ID="lab-troubleshoot-$SEU_ID"
+CLUSTER_ID="lab-troubleshoot-$ID"
 
 echo "🧹 Iniciando limpeza do Lab 03..."
-echo "ID do Aluno: $SEU_ID"
+echo "ID do Aluno: $ID"
 echo "Região: $REGION"
 echo "Cluster ID: $CLUSTER_ID"
 echo ""
@@ -36,7 +36,7 @@ else
     echo "🔍 Verificando alarmes CloudWatch..."
     ALARMS=$(aws cloudwatch describe-alarms \
         --alarm-name-prefix "ElastiCache-" \
-        --query "MetricAlarms[?contains(AlarmName, '$SEU_ID')].AlarmName" \
+        --query "MetricAlarms[?contains(AlarmName, '$ID')].AlarmName" \
         --output text \
         --region $REGION)
     
@@ -96,7 +96,7 @@ echo ""
 echo "🔍 Procurando alarmes CloudWatch para deletar..."
 ALARMS=$(aws cloudwatch describe-alarms \
     --alarm-name-prefix "ElastiCache-" \
-    --query "MetricAlarms[?contains(AlarmName, '$SEU_ID')].AlarmName" \
+    --query "MetricAlarms[?contains(AlarmName, '$ID')].AlarmName" \
     --output text \
     --region $REGION)
 
@@ -114,7 +114,7 @@ fi
 echo ""
 echo "🔍 Verificando outros clusters para limpeza de dados de teste..."
 OTHER_CLUSTERS=$(aws elasticache describe-cache-clusters \
-    --query "CacheClusters[?contains(CacheClusterId, '$SEU_ID')].CacheClusterId" \
+    --query "CacheClusters[?contains(CacheClusterId, '$ID')].CacheClusterId" \
     --output text \
     --region $REGION)
 
@@ -136,14 +136,14 @@ if [ -n "$OTHER_CLUSTERS" ]; then
             # Limpar chaves de teste específicas do lab 03
             redis-cli -h $ENDPOINT -p 6379 << EOF > /dev/null 2>&1 || true
 # Limpar dados de teste de CPU
-DEL cpu_list:$SEU_ID
-DEL cpu_set:$SEU_ID  
-DEL cpu_hash:$SEU_ID
+DEL cpu_list:$ID
+DEL cpu_set:$ID  
+DEL cpu_hash:$ID
 
 # Limpar dados de baseline
-DEL baseline:$SEU_ID:test
-DEL user:$SEU_ID:profile
-DEL events:$SEU_ID
+DEL baseline:$ID:test
+DEL user:$ID:profile
+DEL events:$ID
 
 # Limpar chaves temporárias
 $(for i in {1..20}; do echo "DEL temp_test_$i"; done)
@@ -154,7 +154,7 @@ EOF
                 local cursor = '0'
                 local count = 0
                 repeat
-                    local result = redis.call('SCAN', cursor, 'MATCH', 'cpu_test:$SEU_ID:*', 'COUNT', 100)
+                    local result = redis.call('SCAN', cursor, 'MATCH', 'cpu_test:$ID:*', 'COUNT', 100)
                     cursor = result[1]
                     local keys = result[2]
                     for i=1,#keys do
@@ -179,7 +179,7 @@ echo "   ✅ Alarmes CloudWatch relacionados"
 echo "   ✅ Dados de teste em outros clusters"
 echo ""
 echo "📝 Recursos mantidos (para próximos labs):"
-echo "   - Security Group: elasticache-lab-sg-$SEU_ID"
+echo "   - Security Group: elasticache-lab-sg-$ID"
 echo "   - VPC e Subnet Group compartilhados"
 echo ""
 echo "💰 Custos: Os recursos deletados não gerarão mais custos"

@@ -50,8 +50,8 @@ lab04-troubleshooting-dados/
 ## 🏷️ Convenção de Nomenclatura
 
 Todos os recursos criados devem seguir o padrão:
-- **Cluster de Dados:** `lab-data-{SEU_ID}`
-- **Security Groups:** Reutilizar `elasticache-lab-sg-{SEU_ID}` dos labs anteriores
+- **Cluster de Dados:** `lab-data-$ID`
+- **Security Groups:** Reutilizar `elasticache-lab-sg-$ID` dos labs anteriores
 
 **Exemplo para aluno01:**
 - Cluster: `lab-data-aluno01`
@@ -67,14 +67,14 @@ Todos os recursos criados devem seguir o padrão:
 
 ```bash
 # Definir seu ID (ALTERE AQUI)
-SEU_ID="aluno01"
+ID="aluno01"
 
 # Verificar região
 aws configure get region
 # Deve retornar: us-east-2
 
 # Verificar Security Group dos labs anteriores
-aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$SEU_ID" --region us-east-2
+aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --region us-east-2
 ```
 
 #### Passo 2: Criar Cluster de Dados via Console Web
@@ -84,8 +84,8 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
 3. Configure:
    - **Cluster mode:** Disabled
    - **Cluster info:**
-     - **Name:** `lab-data-{SEU_ID}`
-     - **Description:** `Lab data troubleshooting cluster for {SEU_ID}`
+     - **Name:** `lab-data-$ID`
+     - **Description:** `Lab data troubleshooting cluster for $ID`
    - **Location:**
      - **AWS Cloud**
      - **Multi-AZ:** Disabled (para este lab)
@@ -97,7 +97,7 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
    - **Connectivity:**
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
-     - **Security groups:** Selecione seu SG `elasticache-lab-sg-{SEU_ID}`
+     - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
 
 4. Clique em **Create**
 
@@ -105,10 +105,10 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
 
 ```bash
 # Monitorar criação
-watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-data-$SEU_ID --query 'CacheClusters[0].CacheClusterStatus' --output text --region us-east-2"
+watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-data-$ID --query 'CacheClusters[0].CacheClusterStatus' --output text --region us-east-2"
 
 # Quando disponível, obter endpoint
-DATA_ENDPOINT=$(aws elasticache describe-cache-clusters --cache-cluster-id lab-data-$SEU_ID --show-cache-node-info --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text --region us-east-2)
+DATA_ENDPOINT=$(aws elasticache describe-cache-clusters --cache-cluster-id lab-data-$ID --show-cache-node-info --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text --region us-east-2)
 echo "Data Cluster Endpoint: $DATA_ENDPOINT"
 ```
 
@@ -126,40 +126,40 @@ redis-cli -h $DATA_ENDPOINT -p 6379 << EOF
 FLUSHALL
 
 # === DADOS PEQUENOS (baseline) ===
-$(for i in {1..1000}; do echo "SET small:$SEU_ID:$i value$i"; done)
+$(for i in {1..1000}; do echo "SET small:$ID:$i value$i"; done)
 
 # === STRINGS GRANDES (big keys potenciais) ===
-SET big_string:$SEU_ID:1mb "$(printf 'A%.0s' {1..1048576})"
-SET big_string:$SEU_ID:500kb "$(printf 'B%.0s' {1..512000})"
-SET big_string:$SEU_ID:100kb "$(printf 'C%.0s' {1..102400})"
+SET big_string:$ID:1mb "$(printf 'A%.0s' {1..1048576})"
+SET big_string:$ID:500kb "$(printf 'B%.0s' {1..512000})"
+SET big_string:$ID:100kb "$(printf 'C%.0s' {1..102400})"
 
 # === LISTAS GRANDES ===
-$(for i in {1..10000}; do echo "LPUSH big_list:$SEU_ID item$i"; done)
+$(for i in {1..10000}; do echo "LPUSH big_list:$ID item$i"; done)
 
 # === HASHES GRANDES ===
-$(for i in {1..5000}; do echo "HSET big_hash:$SEU_ID field$i value$i"; done)
+$(for i in {1..5000}; do echo "HSET big_hash:$ID field$i value$i"; done)
 
 # === SETS GRANDES ===
-$(for i in {1..3000}; do echo "SADD big_set:$SEU_ID member$i"; done)
+$(for i in {1..3000}; do echo "SADD big_set:$ID member$i"; done)
 
 # === SORTED SETS GRANDES ===
-$(for i in {1..2000}; do echo "ZADD big_zset:$SEU_ID $i member$i"; done)
+$(for i in {1..2000}; do echo "ZADD big_zset:$ID $i member$i"; done)
 
 # === DADOS COM TTL VARIADO ===
-SET ttl_short:$SEU_ID:1 "expires in 60s" EX 60
-SET ttl_medium:$SEU_ID:1 "expires in 300s" EX 300
-SET ttl_long:$SEU_ID:1 "expires in 3600s" EX 3600
-SET no_ttl:$SEU_ID:1 "never expires"
+SET ttl_short:$ID:1 "expires in 60s" EX 60
+SET ttl_medium:$ID:1 "expires in 300s" EX 300
+SET ttl_long:$ID:1 "expires in 3600s" EX 3600
+SET no_ttl:$ID:1 "never expires"
 
 # === DADOS PARA HOT KEYS ===
-$(for i in {1..100}; do echo "SET hot_candidate:$SEU_ID:$i hotvalue$i"; done)
+$(for i in {1..100}; do echo "SET hot_candidate:$ID:$i hotvalue$i"; done)
 
 # === ESTRUTURAS ANINHADAS (JSON-like) ===
-SET json_data:$SEU_ID:user1 '{"id":1,"name":"João Silva","email":"joao@example.com","preferences":{"theme":"dark","notifications":true},"history":[1,2,3,4,5]}'
-SET json_data:$SEU_ID:user2 '{"id":2,"name":"Maria Santos","email":"maria@example.com","preferences":{"theme":"light","notifications":false},"history":[6,7,8,9,10]}'
+SET json_data:$ID:user1 '{"id":1,"name":"João Silva","email":"joao@example.com","preferences":{"theme":"dark","notifications":true},"history":[1,2,3,4,5]}'
+SET json_data:$ID:user2 '{"id":2,"name":"Maria Santos","email":"maria@example.com","preferences":{"theme":"light","notifications":false},"history":[6,7,8,9,10]}'
 
 # === DADOS DE SESSÃO ===
-$(for i in {1..200}; do echo "HSET session:$SEU_ID:$i user_id $i login_time $(date +%s) ip 192.168.1.$((i%255))"; done)
+$(for i in {1..200}; do echo "HSET session:$ID:$i user_id $i login_time $(date +%s) ip 192.168.1.$((i%255))"; done)
 
 EOF
 
@@ -194,8 +194,8 @@ echo "🔍 Executando análise de big keys..."
 redis-cli -h $DATA_ENDPOINT -p 6379 --bigkeys
 
 # Salvar resultado em arquivo para análise
-redis-cli -h $DATA_ENDPOINT -p 6379 --bigkeys > /tmp/bigkeys_analysis_$SEU_ID.txt
-echo "📄 Resultado salvo em /tmp/bigkeys_analysis_$SEU_ID.txt"
+redis-cli -h $DATA_ENDPOINT -p 6379 --bigkeys > /tmp/bigkeys_analysis_$ID.txt
+echo "📄 Resultado salvo em /tmp/bigkeys_analysis_$ID.txt"
 ```
 
 #### Passo 3: Análise Manual de Chaves Específicas
@@ -206,23 +206,23 @@ echo "🔍 Analisando chaves específicas..."
 
 # Verificar tamanho das big strings
 echo "=== Big Strings ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_string:$SEU_ID:1mb
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_string:$SEU_ID:500kb
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_string:$SEU_ID:100kb
+redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_string:$ID:1mb
+redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_string:$ID:500kb
+redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_string:$ID:100kb
 
 # Verificar tamanho das estruturas grandes
 echo "=== Big Structures ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_list:$SEU_ID
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_hash:$SEU_ID
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_set:$SEU_ID
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_zset:$SEU_ID
+redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_list:$ID
+redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_hash:$ID
+redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_set:$ID
+redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_zset:$ID
 
 # Verificar número de elementos
 echo "=== Contagem de Elementos ==="
-echo "Lista: $(redis-cli -h $DATA_ENDPOINT -p 6379 llen big_list:$SEU_ID) elementos"
-echo "Hash: $(redis-cli -h $DATA_ENDPOINT -p 6379 hlen big_hash:$SEU_ID) campos"
-echo "Set: $(redis-cli -h $DATA_ENDPOINT -p 6379 scard big_set:$SEU_ID) membros"
-echo "Sorted Set: $(redis-cli -h $DATA_ENDPOINT -p 6379 zcard big_zset:$SEU_ID) membros"
+echo "Lista: $(redis-cli -h $DATA_ENDPOINT -p 6379 llen big_list:$ID) elementos"
+echo "Hash: $(redis-cli -h $DATA_ENDPOINT -p 6379 hlen big_hash:$ID) campos"
+echo "Set: $(redis-cli -h $DATA_ENDPOINT -p 6379 scard big_set:$ID) membros"
+echo "Sorted Set: $(redis-cli -h $DATA_ENDPOINT -p 6379 zcard big_zset:$ID) membros"
 ```
 
 #### Passo 4: Impacto de Big Keys na Performance
@@ -234,7 +234,7 @@ echo "🧪 Testando impacto de big keys na performance..."
 # Operação custosa: obter lista completa (MUITO CUSTOSO)
 echo "Testando LRANGE em big_list..."
 START_TIME=$(date +%s%N)
-redis-cli -h $DATA_ENDPOINT -p 6379 lrange big_list:$SEU_ID 0 -1 > /dev/null
+redis-cli -h $DATA_ENDPOINT -p 6379 lrange big_list:$ID 0 -1 > /dev/null
 END_TIME=$(date +%s%N)
 LRANGE_TIME=$(( (END_TIME - START_TIME) / 1000000 ))
 echo "LRANGE completo: ${LRANGE_TIME}ms"
@@ -242,7 +242,7 @@ echo "LRANGE completo: ${LRANGE_TIME}ms"
 # Operação custosa: obter hash completo
 echo "Testando HGETALL em big_hash..."
 START_TIME=$(date +%s%N)
-redis-cli -h $DATA_ENDPOINT -p 6379 hgetall big_hash:$SEU_ID > /dev/null
+redis-cli -h $DATA_ENDPOINT -p 6379 hgetall big_hash:$ID > /dev/null
 END_TIME=$(date +%s%N)
 HGETALL_TIME=$(( (END_TIME - START_TIME) / 1000000 ))
 echo "HGETALL completo: ${HGETALL_TIME}ms"
@@ -250,7 +250,7 @@ echo "HGETALL completo: ${HGETALL_TIME}ms"
 # Comparar com operação simples
 echo "Testando GET em chave pequena..."
 START_TIME=$(date +%s%N)
-redis-cli -h $DATA_ENDPOINT -p 6379 get small:$SEU_ID:1 > /dev/null
+redis-cli -h $DATA_ENDPOINT -p 6379 get small:$ID:1 > /dev/null
 END_TIME=$(date +%s%N)
 GET_TIME=$(( (END_TIME - START_TIME) / 1000000 ))
 echo "GET simples: ${GET_TIME}ms"
@@ -322,7 +322,7 @@ simulate_hot_keys() {
 }
 
 # Executar simulação em background
-simulate_hot_keys $DATA_ENDPOINT $SEU_ID &
+simulate_hot_keys $DATA_ENDPOINT $ID &
 SIMULATION_PID=$!
 
 echo "🔍 Simulação iniciada (PID: $SIMULATION_PID)"
@@ -334,7 +334,7 @@ echo "Aguarde 60 segundos para coleta de dados..."
 ```bash
 # Usar MONITOR para observar comandos (cuidado: muito verboso)
 echo "🔍 Iniciando monitoramento de comandos por 30 segundos..."
-timeout 30 redis-cli -h $DATA_ENDPOINT -p 6379 monitor | grep "hot_candidate:$SEU_ID" > /tmp/monitor_output_$SEU_ID.txt &
+timeout 30 redis-cli -h $DATA_ENDPOINT -p 6379 monitor | grep "hot_candidate:$ID" > /tmp/monitor_output_$ID.txt &
 
 # Aguardar coleta de dados
 sleep 35
@@ -352,14 +352,14 @@ echo "✅ Simulação concluída"
 # Analisar dados coletados
 echo "📊 Analisando padrões de acesso..."
 
-if [ -f /tmp/monitor_output_$SEU_ID.txt ]; then
+if [ -f /tmp/monitor_output_$ID.txt ]; then
     echo "=== Top 10 Chaves Mais Acessadas ==="
-    grep -o "hot_candidate:$SEU_ID:[0-9]*" /tmp/monitor_output_$SEU_ID.txt | sort | uniq -c | sort -nr | head -10
+    grep -o "hot_candidate:$ID:[0-9]*" /tmp/monitor_output_$ID.txt | sort | uniq -c | sort -nr | head -10
     
     echo ""
     echo "=== Estatísticas de Acesso ==="
-    TOTAL_ACCESSES=$(wc -l < /tmp/monitor_output_$SEU_ID.txt)
-    TOP_3_ACCESSES=$(grep -o "hot_candidate:$SEU_ID:[1-3]" /tmp/monitor_output_$SEU_ID.txt | wc -l)
+    TOTAL_ACCESSES=$(wc -l < /tmp/monitor_output_$ID.txt)
+    TOP_3_ACCESSES=$(grep -o "hot_candidate:$ID:[1-3]" /tmp/monitor_output_$ID.txt | wc -l)
     HOT_PERCENTAGE=$(( TOP_3_ACCESSES * 100 / TOTAL_ACCESSES ))
     
     echo "Total de acessos: $TOTAL_ACCESSES"
@@ -387,8 +387,8 @@ redis-cli -h $DATA_ENDPOINT -p 6379 info commandstats | head -10
 # Testar latência específica das hot keys
 echo "=== Latência das Hot Keys ==="
 for key in 1 2 3; do
-    echo "Testando hot_candidate:$SEU_ID:$key"
-    redis-cli -h $DATA_ENDPOINT -p 6379 --latency-history -i 1 get hot_candidate:$SEU_ID:$key | head -5 &
+    echo "Testando hot_candidate:$ID:$key"
+    redis-cli -h $DATA_ENDPOINT -p 6379 --latency-history -i 1 get hot_candidate:$ID:$key | head -5 &
     sleep 2
     kill $! 2>/dev/null || true
 done
@@ -415,16 +415,16 @@ done
 echo "🔍 Analisando TTL das chaves..."
 
 echo "=== TTL das Chaves de Teste ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl ttl_short:$SEU_ID:1
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl ttl_medium:$SEU_ID:1
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl ttl_long:$SEU_ID:1
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl no_ttl:$SEU_ID:1
+redis-cli -h $DATA_ENDPOINT -p 6379 ttl ttl_short:$ID:1
+redis-cli -h $DATA_ENDPOINT -p 6379 ttl ttl_medium:$ID:1
+redis-cli -h $DATA_ENDPOINT -p 6379 ttl ttl_long:$ID:1
+redis-cli -h $DATA_ENDPOINT -p 6379 ttl no_ttl:$ID:1
 
 echo ""
 echo "=== TTL das Big Keys ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl big_string:$SEU_ID:1mb
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl big_list:$SEU_ID
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl big_hash:$SEU_ID
+redis-cli -h $DATA_ENDPOINT -p 6379 ttl big_string:$ID:1mb
+redis-cli -h $DATA_ENDPOINT -p 6379 ttl big_list:$ID
+redis-cli -h $DATA_ENDPOINT -p 6379 ttl big_hash:$ID
 ```
 
 #### Passo 2: Identificar Chaves sem TTL
@@ -449,9 +449,9 @@ check_ttl_patterns() {
 }
 
 # Verificar diferentes padrões
-check_ttl_patterns "big_*:$SEU_ID*"
-check_ttl_patterns "session:$SEU_ID:*"
-check_ttl_patterns "small:$SEU_ID:*"
+check_ttl_patterns "big_*:$ID*"
+check_ttl_patterns "session:$ID:*"
+check_ttl_patterns "small:$ID:*"
 ```
 
 #### Passo 3: Simular Problema de Expiração
@@ -462,7 +462,7 @@ echo "🧪 Simulando problema de expiração..."
 
 # Criar muitas chaves com TTL baixo
 redis-cli -h $DATA_ENDPOINT -p 6379 << EOF
-$(for i in {1..1000}; do echo "SET expire_test:$SEU_ID:$i value$i EX 30"; done)
+$(for i in {1..1000}; do echo "SET expire_test:$ID:$i value$i EX 30"; done)
 EOF
 
 echo "✅ Criadas 1000 chaves com TTL de 30 segundos"
@@ -476,7 +476,7 @@ for i in {1..6}; do
     redis-cli -h $DATA_ENDPOINT -p 6379 info stats | grep -E "(expired_keys|evicted_keys)"
     
     # Contar chaves restantes
-    REMAINING=$(redis-cli -h $DATA_ENDPOINT -p 6379 eval "return #redis.call('keys', 'expire_test:$SEU_ID:*')" 0)
+    REMAINING=$(redis-cli -h $DATA_ENDPOINT -p 6379 eval "return #redis.call('keys', 'expire_test:$ID:*')" 0)
     echo "Chaves restantes: $REMAINING"
     
     sleep 10
@@ -549,19 +549,19 @@ echo "=== Comparação Hash vs Strings ==="
 # Criar dados equivalentes
 redis-cli -h $DATA_ENDPOINT -p 6379 << EOF
 # Usando Hash (eficiente)
-HSET user_hash:$SEU_ID:1 name "João" email "joao@test.com" age "30"
+HSET user_hash:$ID:1 name "João" email "joao@test.com" age "30"
 
 # Usando múltiplas strings (ineficiente)
-SET user_string:$SEU_ID:1:name "João"
-SET user_string:$SEU_ID:1:email "joao@test.com"
-SET user_string:$SEU_ID:1:age "30"
+SET user_string:$ID:1:name "João"
+SET user_string:$ID:1:email "joao@test.com"
+SET user_string:$ID:1:age "30"
 EOF
 
 # Comparar uso de memória
-HASH_SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage user_hash:$SEU_ID:1)
-STRING1_SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage user_string:$SEU_ID:1:name)
-STRING2_SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage user_string:$SEU_ID:1:email)
-STRING3_SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage user_string:$SEU_ID:1:age)
+HASH_SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage user_hash:$ID:1)
+STRING1_SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage user_string:$ID:1:name)
+STRING2_SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage user_string:$ID:1:email)
+STRING3_SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage user_string:$ID:1:age)
 STRINGS_TOTAL=$((STRING1_SIZE + STRING2_SIZE + STRING3_SIZE))
 
 echo "Hash: $HASH_SIZE bytes"
@@ -591,12 +591,12 @@ echo "🔧 Estratégias de Otimização para Big Keys:"
 # Estratégia 1: Paginação de listas grandes
 echo "=== Paginação de Lista Grande ==="
 # Em vez de LRANGE 0 -1 (custoso), usar paginação
-redis-cli -h $DATA_ENDPOINT -p 6379 lrange big_list:$SEU_ID 0 99  # Primeira página
-redis-cli -h $DATA_ENDPOINT -p 6379 lrange big_list:$SEU_ID 100 199  # Segunda página
+redis-cli -h $DATA_ENDPOINT -p 6379 lrange big_list:$ID 0 99  # Primeira página
+redis-cli -h $DATA_ENDPOINT -p 6379 lrange big_list:$ID 100 199  # Segunda página
 
 # Estratégia 2: Usar HSCAN em vez de HGETALL
 echo "=== Scan de Hash Grande ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 hscan big_hash:$SEU_ID 0 COUNT 100
+redis-cli -h $DATA_ENDPOINT -p 6379 hscan big_hash:$ID 0 COUNT 100
 ```
 
 ### 2. Otimização de Hot Keys
@@ -608,9 +608,9 @@ echo "🔧 Estratégias de Otimização para Hot Keys:"
 # Estratégia 1: Replicação de hot keys (simulação)
 redis-cli -h $DATA_ENDPOINT -p 6379 << EOF
 # Replicar hot key em múltiplas chaves
-SET hot_replica:$SEU_ID:1:shard1 "$(redis-cli -h $DATA_ENDPOINT -p 6379 get hot_candidate:$SEU_ID:1)"
-SET hot_replica:$SEU_ID:1:shard2 "$(redis-cli -h $DATA_ENDPOINT -p 6379 get hot_candidate:$SEU_ID:1)"
-SET hot_replica:$SEU_ID:1:shard3 "$(redis-cli -h $DATA_ENDPOINT -p 6379 get hot_candidate:$SEU_ID:1)"
+SET hot_replica:$ID:1:shard1 "$(redis-cli -h $DATA_ENDPOINT -p 6379 get hot_candidate:$ID:1)"
+SET hot_replica:$ID:1:shard2 "$(redis-cli -h $DATA_ENDPOINT -p 6379 get hot_candidate:$ID:1)"
+SET hot_replica:$ID:1:shard3 "$(redis-cli -h $DATA_ENDPOINT -p 6379 get hot_candidate:$ID:1)"
 EOF
 
 echo "✅ Hot key replicada em 3 shards para distribuir carga"
@@ -624,9 +624,9 @@ echo "🔧 Configuração de TTL Inteligente:"
 
 redis-cli -h $DATA_ENDPOINT -p 6379 << EOF
 # TTL baseado no tipo de dados
-SET cache:$SEU_ID:user:1 "user data" EX 3600        # Cache de usuário: 1h
-SET session:$SEU_ID:abc123 "session data" EX 1800   # Sessão: 30min
-SET temp:$SEU_ID:calc "temp result" EX 300          # Resultado temporário: 5min
+SET cache:$ID:user:1 "user data" EX 3600        # Cache de usuário: 1h
+SET session:$ID:abc123 "session data" EX 1800   # Sessão: 30min
+SET temp:$ID:calc "temp result" EX 300          # Resultado temporário: 5min
 EOF
 
 echo "✅ TTL configurado baseado no tipo de dados"
@@ -648,21 +648,21 @@ echo "✅ TTL configurado baseado no tipo de dados"
 
 ### Via Console Web:
 1. **ElastiCache** > **Redis clusters**
-   - Selecione `lab-data-{SEU_ID}`
+   - Selecione `lab-data-$ID`
    - **Actions** > **Delete**
    - Confirme a deleção
 
 ### Via CLI:
 ```bash
 # Deletar cluster de dados
-aws elasticache delete-cache-cluster --cache-cluster-id lab-data-$SEU_ID --region us-east-2
+aws elasticache delete-cache-cluster --cache-cluster-id lab-data-$ID --region us-east-2
 
 # Monitorar deleção
-watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-data-$SEU_ID --region us-east-2 2>/dev/null || echo 'Cluster deletado com sucesso'"
+watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-data-$ID --region us-east-2 2>/dev/null || echo 'Cluster deletado com sucesso'"
 
 # Limpar arquivos temporários
-rm -f /tmp/bigkeys_analysis_$SEU_ID.txt
-rm -f /tmp/monitor_output_$SEU_ID.txt
+rm -f /tmp/bigkeys_analysis_$ID.txt
+rm -f /tmp/monitor_output_$ID.txt
 ```
 
 **NOTA:** Mantenha o Security Group para uso no próximo laboratório.

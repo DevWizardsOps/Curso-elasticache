@@ -2,23 +2,23 @@
 
 # Script de referência para limpeza do Lab 05
 # Região: us-east-2
-# Uso: ./cleanup-lab05.sh <SEU_ID>
+# Uso: ./cleanup-lab05.sh <ID>
 
 set -e
 
 # Verificar parâmetros
 if [ $# -ne 1 ]; then
-    echo "Uso: $0 <SEU_ID>"
+    echo "Uso: $0 <ID>"
     echo "Exemplo: $0 aluno01"
     exit 1
 fi
 
-SEU_ID=$1
+ID=$1
 REGION="us-east-2"
-CLUSTER_ID="lab-insight-$SEU_ID"
+CLUSTER_ID="lab-insight-$ID"
 
 echo "🧹 Iniciando limpeza do Lab 05..."
-echo "ID do Aluno: $SEU_ID"
+echo "ID do Aluno: $ID"
 echo "Região: $REGION"
 echo "Cluster ID: $CLUSTER_ID"
 echo ""
@@ -102,7 +102,7 @@ cleanup_cluster_data() {
                 echo "🧹 Limpando dados via conexão direta..."
                 redis-cli -h $ENDPOINT -p 6379 << EOF > /dev/null 2>&1 || true
 # Limpar dados específicos do Lab 05
-$(redis-cli -h $ENDPOINT -p $PORT --scan --pattern "*:$SEU_ID:*" | while read key; do echo "DEL \"$key\""; done)
+$(redis-cli -h $ENDPOINT -p $PORT --scan --pattern "*:$ID:*" | while read key; do echo "DEL \"$key\""; done)
 EOF
                 echo "✅ Dados limpos via conexão direta"
             
@@ -111,7 +111,7 @@ EOF
                 echo "🧹 Limpando dados via túnel local..."
                 redis-cli -h localhost -p 6380 << EOF > /dev/null 2>&1 || true
 # Limpar dados específicos do Lab 05
-$(redis-cli -h localhost -p 6380 --scan --pattern "*:$SEU_ID:*" | while read key; do echo "DEL \"$key\""; done)
+$(redis-cli -h localhost -p 6380 --scan --pattern "*:$ID:*" | while read key; do echo "DEL \"$key\""; done)
 EOF
                 echo "✅ Dados limpos via túnel local"
             else
@@ -128,11 +128,11 @@ cleanup_temp_files() {
     echo "🗑️  Limpando arquivos temporários..."
     
     # Arquivos relacionados ao Lab 05
-    rm -f /tmp/tunnel_info_$SEU_ID.txt
-    rm -f /tmp/redisinsight_$SEU_ID.log
+    rm -f /tmp/tunnel_info_$ID.txt
+    rm -f /tmp/redisinsight_$ID.log
     rm -f /tmp/redisinsight.log
     rm -f /tmp/start_redisinsight.sh
-    rm -f /tmp/setup_tunnel_$SEU_ID.sh
+    rm -f /tmp/setup_tunnel_$ID.sh
     
     # Logs do RedisInsight
     rm -f /tmp/redisinsight*.log
@@ -197,7 +197,7 @@ cleanup_temp_files
 echo ""
 echo "🔍 Verificando outros clusters para limpeza de dados de teste..."
 OTHER_CLUSTERS=$(aws elasticache describe-cache-clusters \
-    --query "CacheClusters[?contains(CacheClusterId, '$SEU_ID')].CacheClusterId" \
+    --query "CacheClusters[?contains(CacheClusterId, '$ID')].CacheClusterId" \
     --output text \
     --region $REGION)
 
@@ -219,14 +219,14 @@ if [ -n "$OTHER_CLUSTERS" ]; then
             # Limpar dados específicos do lab 05
             redis-cli -h $ENDPOINT -p 6379 eval "
                 local patterns = {
-                    'product:$SEU_ID:*', 'user:$SEU_ID:*', 'cart:$SEU_ID:*',
-                    'category:$SEU_ID:*', 'ranking:$SEU_ID:*', 'session:$SEU_ID:*',
-                    'cache:$SEU_ID:*', 'counter:$SEU_ID:*', 'metrics:$SEU_ID:*',
-                    'analytics:$SEU_ID:*', 'geo:$SEU_ID:*', 'config:$SEU_ID:*',
-                    'inventory:$SEU_ID:*', 'pricing:$SEU_ID:*', '*_string:$SEU_ID',
-                    '*_list:$SEU_ID', '*_hash:$SEU_ID', '*_set:$SEU_ID', '*_zset:$SEU_ID',
-                    'expires_*:$SEU_ID', 'unique_visitors:$SEU_ID', 'daily_active_users:$SEU_ID',
-                    'active_days:$SEU_ID:*'
+                    'product:$ID:*', 'user:$ID:*', 'cart:$ID:*',
+                    'category:$ID:*', 'ranking:$ID:*', 'session:$ID:*',
+                    'cache:$ID:*', 'counter:$ID:*', 'metrics:$ID:*',
+                    'analytics:$ID:*', 'geo:$ID:*', 'config:$ID:*',
+                    'inventory:$ID:*', 'pricing:$ID:*', '*_string:$ID',
+                    '*_list:$ID', '*_hash:$ID', '*_set:$ID', '*_zset:$ID',
+                    'expires_*:$ID', 'unique_visitors:$ID', 'daily_active_users:$ID',
+                    'active_days:$ID:*'
                 }
                 local total_deleted = 0
                 for _, pattern in ipairs(patterns) do
@@ -261,7 +261,7 @@ echo "   ✅ Arquivos temporários"
 echo "   ✅ Dados de teste em outros clusters"
 echo ""
 echo "📝 Recursos mantidos (para outros projetos):"
-echo "   - Security Group: elasticache-lab-sg-$SEU_ID"
+echo "   - Security Group: elasticache-lab-sg-$ID"
 echo "   - VPC e Subnet Group compartilhados"
 echo "   - Instalação do RedisInsight (se instalado)"
 echo ""

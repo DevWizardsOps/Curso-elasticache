@@ -2,24 +2,24 @@
 
 # Script de referência para criar cluster de teste para troubleshooting
 # Região: us-east-2
-# Uso: ./create-test-cluster.sh <SEU_ID>
+# Uso: ./create-test-cluster.sh <ID>
 
 set -e
 
 # Verificar parâmetros
 if [ $# -ne 1 ]; then
-    echo "Uso: $0 <SEU_ID>"
+    echo "Uso: $0 <ID>"
     echo "Exemplo: $0 aluno01"
     exit 1
 fi
 
-SEU_ID=$1
+ID=$1
 REGION="us-east-2"
-CLUSTER_ID="lab-troubleshoot-$SEU_ID"
-SECURITY_GROUP_NAME="elasticache-lab-sg-$SEU_ID"
+CLUSTER_ID="lab-troubleshoot-$ID"
+SECURITY_GROUP_NAME="elasticache-lab-sg-$ID"
 
 echo "🚀 Criando cluster de teste para troubleshooting..."
-echo "ID do Aluno: $SEU_ID"
+echo "ID do Aluno: $ID"
 echo "Região: $REGION"
 echo "Cluster ID: $CLUSTER_ID"
 
@@ -86,9 +86,9 @@ if redis-cli -h $ENDPOINT -p 6379 ping > /dev/null 2>&1; then
     echo "📊 Inserindo dados de baseline..."
     redis-cli -h $ENDPOINT -p 6379 << EOF > /dev/null
 FLUSHALL
-SET baseline:$SEU_ID:test "Cluster funcionando"
-HSET user:$SEU_ID:profile name "Test User" email "test@example.com"
-LPUSH events:$SEU_ID "cluster_created" "baseline_data_inserted"
+SET baseline:$ID:test "Cluster funcionando"
+HSET user:$ID:profile name "Test User" email "test@example.com"
+LPUSH events:$ID "cluster_created" "baseline_data_inserted"
 EOF
     
     echo "✅ Dados de baseline inseridos"

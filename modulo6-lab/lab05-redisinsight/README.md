@@ -48,8 +48,8 @@ lab05-redisinsight/
 ## 🏷️ Convenção de Nomenclatura
 
 Todos os recursos criados devem seguir o padrão:
-- **Cluster RedisInsight:** `lab-insight-{SEU_ID}`
-- **Security Groups:** Reutilizar `elasticache-lab-sg-{SEU_ID}` dos labs anteriores
+- **Cluster RedisInsight:** `lab-insight-$ID`
+- **Security Groups:** Reutilizar `elasticache-lab-sg-$ID` dos labs anteriores
 
 **Exemplo para aluno01:**
 - Cluster: `lab-insight-aluno01`
@@ -65,7 +65,7 @@ Todos os recursos criados devem seguir o padrão:
 
 ```bash
 # Definir seu ID (ALTERE AQUI)
-SEU_ID="aluno01"
+ID="aluno01"
 
 # Verificar região
 aws configure get region
@@ -82,8 +82,8 @@ which redisinsight || echo "RedisInsight não encontrado - será instalado"
 3. Configure:
    - **Cluster mode:** Disabled (melhor para RedisInsight)
    - **Cluster info:**
-     - **Name:** `lab-insight-{SEU_ID}`
-     - **Description:** `Lab RedisInsight cluster for {SEU_ID}`
+     - **Name:** `lab-insight-$ID`
+     - **Description:** `Lab RedisInsight cluster for $ID`
    - **Location:**
      - **AWS Cloud**
      - **Multi-AZ:** Disabled (para este lab)
@@ -95,7 +95,7 @@ which redisinsight || echo "RedisInsight não encontrado - será instalado"
    - **Connectivity:**
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
-     - **Security groups:** Selecione seu SG `elasticache-lab-sg-{SEU_ID}`
+     - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
 
 4. Clique em **Create**
 
@@ -103,10 +103,10 @@ which redisinsight || echo "RedisInsight não encontrado - será instalado"
 
 ```bash
 # Monitorar criação
-watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-insight-$SEU_ID --query 'CacheClusters[0].CacheClusterStatus' --output text --region us-east-2"
+watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-insight-$ID --query 'CacheClusters[0].CacheClusterStatus' --output text --region us-east-2"
 
 # Quando disponível, obter endpoint
-INSIGHT_ENDPOINT=$(aws elasticache describe-cache-clusters --cache-cluster-id lab-insight-$SEU_ID --show-cache-node-info --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text --region us-east-2)
+INSIGHT_ENDPOINT=$(aws elasticache describe-cache-clusters --cache-cluster-id lab-insight-$ID --show-cache-node-info --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text --region us-east-2)
 echo "RedisInsight Cluster Endpoint: $INSIGHT_ENDPOINT"
 ```
 
@@ -126,64 +126,64 @@ FLUSHALL
 # === DADOS DE E-COMMERCE (para demonstrar estruturas reais) ===
 
 # Produtos
-HSET product:$SEU_ID:1001 name "Smartphone Galaxy" price "899.99" category "electronics" stock "50" rating "4.5"
-HSET product:$SEU_ID:1002 name "Notebook Dell" price "1299.99" category "computers" stock "25" rating "4.2"
-HSET product:$SEU_ID:1003 name "Headphone Sony" price "199.99" category "audio" stock "100" rating "4.7"
+HSET product:$ID:1001 name "Smartphone Galaxy" price "899.99" category "electronics" stock "50" rating "4.5"
+HSET product:$ID:1002 name "Notebook Dell" price "1299.99" category "computers" stock "25" rating "4.2"
+HSET product:$ID:1003 name "Headphone Sony" price "199.99" category "audio" stock "100" rating "4.7"
 
 # Usuários
-HSET user:$SEU_ID:2001 name "João Silva" email "joao@email.com" city "São Paulo" signup_date "2024-01-15" status "active"
-HSET user:$SEU_ID:2002 name "Maria Santos" email "maria@email.com" city "Rio de Janeiro" signup_date "2024-02-20" status "active"
-HSET user:$SEU_ID:2003 name "Pedro Costa" email "pedro@email.com" city "Belo Horizonte" signup_date "2024-03-10" status "premium"
+HSET user:$ID:2001 name "João Silva" email "joao@email.com" city "São Paulo" signup_date "2024-01-15" status "active"
+HSET user:$ID:2002 name "Maria Santos" email "maria@email.com" city "Rio de Janeiro" signup_date "2024-02-20" status "active"
+HSET user:$ID:2003 name "Pedro Costa" email "pedro@email.com" city "Belo Horizonte" signup_date "2024-03-10" status "premium"
 
 # Carrinho de compras (listas)
-LPUSH cart:$SEU_ID:2001 "product:$SEU_ID:1001" "product:$SEU_ID:1003"
-LPUSH cart:$SEU_ID:2002 "product:$SEU_ID:1002"
-LPUSH cart:$SEU_ID:2003 "product:$SEU_ID:1001" "product:$SEU_ID:1002" "product:$SEU_ID:1003"
+LPUSH cart:$ID:2001 "product:$ID:1001" "product:$ID:1003"
+LPUSH cart:$ID:2002 "product:$ID:1002"
+LPUSH cart:$ID:2003 "product:$ID:1001" "product:$ID:1002" "product:$ID:1003"
 
 # Categorias (sets)
-SADD category:$SEU_ID:electronics "product:$SEU_ID:1001"
-SADD category:$SEU_ID:computers "product:$SEU_ID:1002"
-SADD category:$SEU_ID:audio "product:$SEU_ID:1003"
+SADD category:$ID:electronics "product:$ID:1001"
+SADD category:$ID:computers "product:$ID:1002"
+SADD category:$ID:audio "product:$ID:1003"
 
 # Rankings de produtos (sorted sets)
-ZADD ranking:$SEU_ID:bestsellers 4.5 "product:$SEU_ID:1001"
-ZADD ranking:$SEU_ID:bestsellers 4.2 "product:$SEU_ID:1002"
-ZADD ranking:$SEU_ID:bestsellers 4.7 "product:$SEU_ID:1003"
+ZADD ranking:$ID:bestsellers 4.5 "product:$ID:1001"
+ZADD ranking:$ID:bestsellers 4.2 "product:$ID:1002"
+ZADD ranking:$ID:bestsellers 4.7 "product:$ID:1003"
 
-ZADD ranking:$SEU_ID:price 899.99 "product:$SEU_ID:1001"
-ZADD ranking:$SEU_ID:price 1299.99 "product:$SEU_ID:1002"
-ZADD ranking:$SEU_ID:price 199.99 "product:$SEU_ID:1003"
+ZADD ranking:$ID:price 899.99 "product:$ID:1001"
+ZADD ranking:$ID:price 1299.99 "product:$ID:1002"
+ZADD ranking:$ID:price 199.99 "product:$ID:1003"
 
 # Sessões ativas
-$(for i in {1..10}; do echo "SET session:$SEU_ID:sess$i user:$SEU_ID:200$((i%3+1)) EX 3600"; done)
+$(for i in {1..10}; do echo "SET session:$ID:sess$i user:$ID:200$((i%3+1)) EX 3600"; done)
 
 # Cache de consultas
-SET cache:$SEU_ID:popular_products '["product:1001","product:1003","product:1002"]' EX 1800
-SET cache:$SEU_ID:categories '["electronics","computers","audio"]' EX 3600
+SET cache:$ID:popular_products '["product:1001","product:1003","product:1002"]' EX 1800
+SET cache:$ID:categories '["electronics","computers","audio"]' EX 3600
 
 # Contadores
-SET counter:$SEU_ID:page_views 15420
-SET counter:$SEU_ID:orders_today 87
-SET counter:$SEU_ID:active_users 234
+SET counter:$ID:page_views 15420
+SET counter:$ID:orders_today 87
+SET counter:$ID:active_users 234
 
 # Dados JSON complexos
-SET analytics:$SEU_ID:daily '{"date":"2024-01-20","visitors":1250,"sales":15600,"top_products":["1001","1003"],"conversion_rate":3.2}'
+SET analytics:$ID:daily '{"date":"2024-01-20","visitors":1250,"sales":15600,"top_products":["1001","1003"],"conversion_rate":3.2}'
 
 # Dados geoespaciais (se suportado)
-# GEOADD locations:$SEU_ID -46.6333 -23.5505 "São Paulo"
-# GEOADD locations:$SEU_ID -43.1729 -22.9068 "Rio de Janeiro"
+# GEOADD locations:$ID -46.6333 -23.5505 "São Paulo"
+# GEOADD locations:$ID -43.1729 -22.9068 "Rio de Janeiro"
 
 # Dados de time series (simulado)
-$(for i in {1..24}; do echo "SET metrics:$SEU_ID:hour$i:cpu $((RANDOM % 100))"; done)
-$(for i in {1..24}; do echo "SET metrics:$SEU_ID:hour$i:memory $((RANDOM % 100))"; done)
+$(for i in {1..24}; do echo "SET metrics:$ID:hour$i:cpu $((RANDOM % 100))"; done)
+$(for i in {1..24}; do echo "SET metrics:$ID:hour$i:memory $((RANDOM % 100))"; done)
 
 # HyperLogLog para contagem aproximada
-PFADD unique_visitors:$SEU_ID user1 user2 user3 user4 user5
+PFADD unique_visitors:$ID user1 user2 user3 user4 user5
 
 # Bitmap para tracking
-SETBIT active_days:$SEU_ID:user2001 1 1
-SETBIT active_days:$SEU_ID:user2001 5 1
-SETBIT active_days:$SEU_ID:user2001 10 1
+SETBIT active_days:$ID:user2001 1 1
+SETBIT active_days:$ID:user2001 5 1
+SETBIT active_days:$ID:user2001 10 1
 
 EOF
 
@@ -229,7 +229,7 @@ echo "Bastion Host IP: $BASTION_IP"
 echo "🔧 Configurando túnel SSH..."
 
 # Criar script de túnel
-cat > /tmp/setup_tunnel_$SEU_ID.sh << EOF
+cat > /tmp/setup_tunnel_$ID.sh << EOF
 #!/bin/bash
 
 # Configuração do túnel SSH para RedisInsight
@@ -258,8 +258,8 @@ else
 fi
 EOF
 
-chmod +x /tmp/setup_tunnel_$SEU_ID.sh
-echo "✅ Script de túnel criado: /tmp/setup_tunnel_$SEU_ID.sh"
+chmod +x /tmp/setup_tunnel_$ID.sh
+echo "✅ Script de túnel criado: /tmp/setup_tunnel_$ID.sh"
 ```
 
 #### Passo 3: Iniciar RedisInsight
@@ -272,7 +272,7 @@ echo "🚀 Iniciando RedisInsight..."
 REDISINSIGHT_PORT=8001
 
 # Iniciar RedisInsight
-nohup redisinsight --port $REDISINSIGHT_PORT > /tmp/redisinsight_$SEU_ID.log 2>&1 &
+nohup redisinsight --port $REDISINSIGHT_PORT > /tmp/redisinsight_$ID.log 2>&1 &
 REDISINSIGHT_PID=$!
 
 echo "✅ RedisInsight iniciado na porta $REDISINSIGHT_PORT (PID: $REDISINSIGHT_PID)"
@@ -286,7 +286,7 @@ if ps -p $REDISINSIGHT_PID > /dev/null; then
     echo "✅ RedisInsight está rodando"
 else
     echo "❌ Problema ao iniciar RedisInsight"
-    echo "Verifique os logs: tail -f /tmp/redisinsight_$SEU_ID.log"
+    echo "Verifique os logs: tail -f /tmp/redisinsight_$ID.log"
 fi
 ```
 
@@ -303,7 +303,7 @@ fi
    - **Connection Type:** Standalone
    - **Host:** `localhost` (via túnel SSH)
    - **Port:** `6380` (porta do túnel)
-   - **Database Alias:** `ElastiCache-Lab-{SEU_ID}`
+   - **Database Alias:** `ElastiCache-Lab-$ID`
    - **Username:** (deixe vazio)
    - **Password:** (deixe vazio)
 4. **Testar Conexão:**
@@ -372,12 +372,12 @@ fi
    ```bash
    # Em outro terminal, gere atividade
    redis-cli -h localhost -p 6380 << EOF
-   GET product:$SEU_ID:1001
-   HGETALL user:$SEU_ID:2001
-   LRANGE cart:$SEU_ID:2001 0 -1
-   SMEMBERS category:$SEU_ID:electronics
-   ZRANGE ranking:$SEU_ID:bestsellers 0 -1 WITHSCORES
-   INCR counter:$SEU_ID:page_views
+   GET product:$ID:1001
+   HGETALL user:$ID:2001
+   LRANGE cart:$ID:2001 0 -1
+   SMEMBERS category:$ID:electronics
+   ZRANGE ranking:$ID:bestsellers 0 -1 WITHSCORES
+   INCR counter:$ID:page_views
    EOF
    ```
 
@@ -487,7 +487,7 @@ fi
 aws cloudwatch get-metric-statistics \
     --namespace AWS/ElastiCache \
     --metric-name CPUUtilization \
-    --dimensions Name=CacheClusterId,Value=lab-insight-$SEU_ID \
+    --dimensions Name=CacheClusterId,Value=lab-insight-$ID \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
@@ -511,7 +511,7 @@ aws cloudwatch get-metric-statistics \
 
 ### Via Console Web:
 1. **ElastiCache** > **Redis clusters**
-   - Selecione `lab-insight-{SEU_ID}`
+   - Selecione `lab-insight-$ID`
    - **Actions** > **Delete**
    - Confirme a deleção
 
@@ -524,11 +524,11 @@ pkill -f redisinsight
 pkill -f "ssh.*$INSIGHT_ENDPOINT"
 
 # Deletar cluster
-aws elasticache delete-cache-cluster --cache-cluster-id lab-insight-$SEU_ID --region us-east-2
+aws elasticache delete-cache-cluster --cache-cluster-id lab-insight-$ID --region us-east-2
 
 # Limpar arquivos temporários
-rm -f /tmp/setup_tunnel_$SEU_ID.sh
-rm -f /tmp/redisinsight_$SEU_ID.log
+rm -f /tmp/setup_tunnel_$ID.sh
+rm -f /tmp/redisinsight_$ID.log
 ```
 
 **NOTA:** Mantenha o Security Group se planeja usar em outros projetos.

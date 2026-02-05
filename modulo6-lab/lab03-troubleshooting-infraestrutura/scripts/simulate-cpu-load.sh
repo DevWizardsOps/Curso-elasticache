@@ -2,21 +2,21 @@
 
 # Script de referência para simular carga de CPU no ElastiCache
 # Região: us-east-2
-# Uso: ./simulate-cpu-load.sh <SEU_ID> [DURATION_SECONDS]
+# Uso: ./simulate-cpu-load.sh <ID> [DURATION_SECONDS]
 
 set -e
 
 # Verificar parâmetros
 if [ $# -lt 1 ]; then
-    echo "Uso: $0 <SEU_ID> [DURATION_SECONDS]"
+    echo "Uso: $0 <ID> [DURATION_SECONDS]"
     echo "Exemplo: $0 aluno01 300"
     exit 1
 fi
 
-SEU_ID=$1
+ID=$1
 DURATION=${2:-300}  # Default: 5 minutos
 REGION="us-east-2"
-CLUSTER_ID="lab-troubleshoot-$SEU_ID"
+CLUSTER_ID="lab-troubleshoot-$ID"
 
 echo "🧪 Simulando carga de CPU no cluster $CLUSTER_ID"
 echo "Duração: $DURATION segundos"
@@ -50,10 +50,10 @@ echo "✅ Conectividade OK"
 echo "📊 Preparando dados para teste de CPU..."
 redis-cli -h $ENDPOINT -p 6379 << EOF > /dev/null
 # Criar estruturas que consomem CPU para busca
-$(for i in {1..5000}; do echo "SET cpu_test:$SEU_ID:key$i value$i"; done)
-$(for i in {1..1000}; do echo "LPUSH cpu_list:$SEU_ID item$i"; done)
-$(for i in {1..500}; do echo "SADD cpu_set:$SEU_ID member$i"; done)
-$(for i in {1..200}; do echo "HSET cpu_hash:$SEU_ID field$i value$i"; done)
+$(for i in {1..5000}; do echo "SET cpu_test:$ID:key$i value$i"; done)
+$(for i in {1..1000}; do echo "LPUSH cpu_list:$ID item$i"; done)
+$(for i in {1..500}; do echo "SADD cpu_set:$ID member$i"; done)
+$(for i in {1..200}; do echo "HSET cpu_hash:$ID field$i value$i"; done)
 EOF
 
 echo "✅ Dados preparados"
@@ -149,11 +149,11 @@ monitor_performance() {
 echo "🚀 Iniciando simulação..."
 
 # Executar geração de carga em background
-generate_cpu_load $ENDPOINT $SEU_ID &
+generate_cpu_load $ENDPOINT $ID &
 LOAD_PID=$!
 
 # Executar monitoramento em foreground
-monitor_performance $ENDPOINT $SEU_ID
+monitor_performance $ENDPOINT $ID
 
 # Aguardar conclusão da carga
 wait $LOAD_PID
@@ -163,9 +163,9 @@ echo "✅ Simulação de carga concluída"
 # Limpeza dos dados de teste
 echo "🧹 Limpando dados de teste..."
 redis-cli -h $ENDPOINT -p 6379 << EOF > /dev/null
-DEL cpu_list:$SEU_ID
-DEL cpu_set:$SEU_ID
-DEL cpu_hash:$SEU_ID
+DEL cpu_list:$ID
+DEL cpu_set:$ID
+DEL cpu_hash:$ID
 $(for i in {1..10}; do echo "DEL temp_test_$i"; done)
 EOF
 
@@ -174,7 +174,7 @@ redis-cli -h $ENDPOINT -p 6379 eval "
     local cursor = '0'
     local count = 0
     repeat
-        local result = redis.call('SCAN', cursor, 'MATCH', 'cpu_test:$SEU_ID:*', 'COUNT', 100)
+        local result = redis.call('SCAN', cursor, 'MATCH', 'cpu_test:$ID:*', 'COUNT', 100)
         cursor = result[1]
         local keys = result[2]
         for i=1,#keys do

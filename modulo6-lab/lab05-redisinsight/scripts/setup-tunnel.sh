@@ -2,23 +2,23 @@
 
 # Script de referência para configurar túnel SSH para RedisInsight
 # Região: us-east-2
-# Uso: ./setup-tunnel.sh <SEU_ID> <ENDPOINT> [LOCAL_PORT]
+# Uso: ./setup-tunnel.sh <ID> <ENDPOINT> [LOCAL_PORT]
 
 set -e
 
 # Verificar parâmetros
 if [ $# -lt 2 ]; then
-    echo "Uso: $0 <SEU_ID> <ENDPOINT> [LOCAL_PORT]"
+    echo "Uso: $0 <ID> <ENDPOINT> [LOCAL_PORT]"
     echo "Exemplo: $0 aluno01 lab-insight-aluno01.abc123.cache.amazonaws.com 6380"
     exit 1
 fi
 
-SEU_ID=$1
+ID=$1
 ENDPOINT=$2
 LOCAL_PORT=${3:-6380}  # Default: 6380
 
 echo "🔗 Configurando túnel SSH para RedisInsight..."
-echo "ID do Aluno: $SEU_ID"
+echo "ID do Aluno: $ID"
 echo "Endpoint ElastiCache: $ENDPOINT"
 echo "Porta local: $LOCAL_PORT"
 
@@ -102,9 +102,9 @@ else
 fi
 
 # Salvar informações do túnel
-TUNNEL_INFO_FILE="/tmp/tunnel_info_$SEU_ID.txt"
+TUNNEL_INFO_FILE="/tmp/tunnel_info_$ID.txt"
 cat > $TUNNEL_INFO_FILE << EOF
-# Informações do Túnel SSH - $SEU_ID
+# Informações do Túnel SSH - $ID
 # Criado em: $(date)
 
 ENDPOINT=$ENDPOINT
@@ -130,7 +130,7 @@ echo ""
 echo "📋 Configuração para RedisInsight:"
 echo "   Host: localhost"
 echo "   Port: $LOCAL_PORT"
-echo "   Database Alias: ElastiCache-Lab-$SEU_ID"
+echo "   Database Alias: ElastiCache-Lab-$ID"
 echo ""
 echo "🧪 Teste de conectividade:"
 echo "   redis-cli -h localhost -p $LOCAL_PORT ping"

@@ -2,24 +2,24 @@
 
 # Script de referência para criar cluster com réplicas para teste de failover
 # Região: us-east-2
-# Uso: ./create-cluster-with-replicas.sh <SEU_ID>
+# Uso: ./create-cluster-with-replicas.sh <ID>
 
 set -e
 
 # Verificar parâmetros
 if [ $# -ne 1 ]; then
-    echo "Uso: $0 <SEU_ID>"
+    echo "Uso: $0 <ID>"
     echo "Exemplo: $0 aluno01"
     exit 1
 fi
 
-SEU_ID=$1
+ID=$1
 REGION="us-east-2"
-REPLICATION_GROUP_ID="lab-failover-$SEU_ID"
-SECURITY_GROUP_NAME="elasticache-lab-sg-$SEU_ID"
+REPLICATION_GROUP_ID="lab-failover-$ID"
+SECURITY_GROUP_NAME="elasticache-lab-sg-$ID"
 
 echo "🚀 Criando cluster com réplicas para failover..."
-echo "ID do Aluno: $SEU_ID"
+echo "ID do Aluno: $ID"
 echo "Região: $REGION"
 echo "Replication Group: $REPLICATION_GROUP_ID"
 
@@ -43,7 +43,7 @@ echo "✅ Security Group encontrado: $SG_ID"
 echo "🔧 Criando Replication Group com réplicas..."
 aws elasticache create-replication-group \
     --replication-group-id $REPLICATION_GROUP_ID \
-    --description "Lab failover cluster for $SEU_ID" \
+    --description "Lab failover cluster for $ID" \
     --num-cache-clusters 3 \
     --cache-node-type cache.t3.micro \
     --engine redis \

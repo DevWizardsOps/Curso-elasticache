@@ -2,24 +2,24 @@
 
 # Script de referência para testar conectividade do ElastiCache
 # Região: us-east-2
-# Uso: ./test-connectivity.sh <SEU_ID>
+# Uso: ./test-connectivity.sh <ID>
 
 set -e
 
 # Verificar parâmetros
 if [ $# -ne 1 ]; then
-    echo "Uso: $0 <SEU_ID>"
+    echo "Uso: $0 <ID>"
     echo "Exemplo: $0 aluno01"
     exit 1
 fi
 
-SEU_ID=$1
+ID=$1
 REGION="us-east-2"
-CLUSTER_ID="lab-troubleshoot-$SEU_ID"
-SECURITY_GROUP_NAME="elasticache-lab-sg-$SEU_ID"
+CLUSTER_ID="lab-troubleshoot-$ID"
+SECURITY_GROUP_NAME="elasticache-lab-sg-$ID"
 
 echo "🔍 Testando conectividade do cluster $CLUSTER_ID"
-echo "ID do Aluno: $SEU_ID"
+echo "ID do Aluno: $ID"
 echo "Região: $REGION"
 echo ""
 
@@ -140,7 +140,7 @@ fi
 # 8. Teste de operações básicas
 echo ""
 echo "8️⃣ Testando operações básicas..."
-TEST_KEY="connectivity_test:$SEU_ID:$(date +%s)"
+TEST_KEY="connectivity_test:$ID:$(date +%s)"
 TEST_VALUE="test_value_$(date +%s)"
 
 # Teste SET

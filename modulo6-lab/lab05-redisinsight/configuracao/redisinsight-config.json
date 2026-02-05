@@ -6,7 +6,7 @@
   "connections": [
     {
       "id": "elasticache-lab-connection",
-      "name": "ElastiCache Lab - {SEU_ID}",
+      "name": "ElastiCache Lab - {ID}",
       "connectionType": "standalone",
       "host": "localhost",
       "port": 6380,

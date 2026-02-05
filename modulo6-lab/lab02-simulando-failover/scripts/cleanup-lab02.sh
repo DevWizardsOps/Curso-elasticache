@@ -2,23 +2,23 @@
 
 # Script de referência para limpeza do Lab 02
 # Região: us-east-2
-# Uso: ./cleanup-lab02.sh <SEU_ID>
+# Uso: ./cleanup-lab02.sh <ID>
 
 set -e
 
 # Verificar parâmetros
 if [ $# -ne 1 ]; then
-    echo "Uso: $0 <SEU_ID>"
+    echo "Uso: $0 <ID>"
     echo "Exemplo: $0 aluno01"
     exit 1
 fi
 
-SEU_ID=$1
+ID=$1
 REGION="us-east-2"
-REPLICATION_GROUP_ID="lab-failover-$SEU_ID"
+REPLICATION_GROUP_ID="lab-failover-$ID"
 
 echo "🧹 Iniciando limpeza do Lab 02..."
-echo "ID do Aluno: $SEU_ID"
+echo "ID do Aluno: $ID"
 echo "Região: $REGION"
 echo "Replication Group: $REPLICATION_GROUP_ID"
 echo ""
@@ -74,7 +74,7 @@ echo ""
 echo "🎉 Limpeza do Lab 02 concluída!"
 echo ""
 echo "📝 Recursos mantidos (para próximos labs):"
-echo "   - Security Group: elasticache-lab-sg-$SEU_ID"
+echo "   - Security Group: elasticache-lab-sg-$ID"
 echo "   - VPC e Subnet Group compartilhados"
 echo ""
 echo "💰 Custos: Os recursos deletados não gerarão mais custos"

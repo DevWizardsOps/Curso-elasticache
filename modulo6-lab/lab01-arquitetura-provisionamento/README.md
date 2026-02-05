@@ -46,8 +46,8 @@ lab01-arquitetura-provisionamento/
 ## 🏷️ Convenção de Nomenclatura
 
 Todos os recursos criados devem seguir o padrão:
-- **Security Groups:** `elasticache-lab-sg-{SEU_ID}`
-- **Clusters:** `lab-cluster-disabled-{SEU_ID}` e `lab-cluster-enabled-{SEU_ID}`
+- **Security Groups:** `elasticache-lab-sg-$ID`
+- **Clusters:** `lab-cluster-disabled-$ID` e `lab-cluster-enabled-$ID`
 - **Subnet Groups:** Compartilhado entre todos os alunos
 
 **Exemplo para aluno01:**
@@ -116,8 +116,8 @@ aws elasticache describe-cache-subnet-groups --cache-subnet-group-name elasticac
 1. Acesse **EC2** > **Security Groups**
 2. Clique em **Create security group**
 3. Configure:
-   - **Security group name:** `elasticache-lab-sg-{SEU_ID}`
-   - **Description:** `ElastiCache Lab Security Group for {SEU_ID}`
+   - **Security group name:** `elasticache-lab-sg-$ID`
+   - **Description:** `ElastiCache Lab Security Group for $ID`
    - **VPC:** Selecione a VPC `ElastiCache-Lab-VPC`
 
 #### Passo 2: Configurar Regras de Entrada
@@ -133,14 +133,14 @@ aws elasticache describe-cache-subnet-groups --cache-subnet-group-name elasticac
 #### Passo 3: Verificar via CLI
 
 ```bash
-# Substituir {SEU_ID} pelo seu ID real
-SEU_ID="aluno01"  # ALTERE AQUI
+# Substituir $ID pelo seu ID real
+ID="aluno01"  # ALTERE AQUI
 
 # Verificar Security Group criado
-aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$SEU_ID" --region us-east-2
+aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --region us-east-2
 
 # Salvar Security Group ID
-SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$SEU_ID" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
+SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
 echo "Security Group ID: $SG_ID"
 ```
 
@@ -159,8 +159,8 @@ echo "Security Group ID: $SG_ID"
 3. Configure:
    - **Cluster mode:** Disabled
    - **Cluster info:**
-     - **Name:** `lab-cluster-disabled-{SEU_ID}`
-     - **Description:** `Lab cluster disabled for {SEU_ID}`
+     - **Name:** `lab-cluster-disabled-$ID`
+     - **Description:** `Lab cluster disabled for $ID`
    - **Location:**
      - **AWS Cloud**
      - **Multi-AZ:** Disabled (para este lab)
@@ -172,7 +172,7 @@ echo "Security Group ID: $SG_ID"
    - **Connectivity:**
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
-     - **Security groups:** Selecione seu SG `elasticache-lab-sg-{SEU_ID}`
+     - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
 
 4. Clique em **Create**
 
@@ -180,10 +180,10 @@ echo "Security Group ID: $SG_ID"
 
 ```bash
 # Monitorar status do cluster
-aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$SEU_ID --show-cache-node-info --region us-east-2
+aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --show-cache-node-info --region us-east-2
 
 # Aguardar até status "available" (pode levar 10-15 minutos)
-watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$SEU_ID --query 'CacheClusters[0].CacheClusterStatus' --output text --region us-east-2"
+watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --query 'CacheClusters[0].CacheClusterStatus' --output text --region us-east-2"
 ```
 
 #### Passo 3: Analisar Endpoints
@@ -192,11 +192,11 @@ Quando o cluster estiver disponível:
 
 ```bash
 # Obter endpoint do cluster
-ENDPOINT_DISABLED=$(aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$SEU_ID --show-cache-node-info --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text --region us-east-2)
+ENDPOINT_DISABLED=$(aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --show-cache-node-info --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text --region us-east-2)
 echo "Endpoint Disabled: $ENDPOINT_DISABLED"
 
 # Informações detalhadas
-aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$SEU_ID --show-cache-node-info --region us-east-2
+aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --show-cache-node-info --region us-east-2
 ```
 
 **Características do Modo Disabled:**
@@ -220,8 +220,8 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-
 3. Configure:
    - **Cluster mode:** Enabled
    - **Cluster info:**
-     - **Name:** `lab-cluster-enabled-{SEU_ID}`
-     - **Description:** `Lab cluster enabled for {SEU_ID}`
+     - **Name:** `lab-cluster-enabled-$ID`
+     - **Description:** `Lab cluster enabled for $ID`
    - **Location:**
      - **AWS Cloud**
      - **Multi-AZ:** Enabled
@@ -234,7 +234,7 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-
    - **Connectivity:**
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
-     - **Security groups:** Selecione seu SG `elasticache-lab-sg-{SEU_ID}`
+     - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
 
 4. Clique em **Create**
 
@@ -242,10 +242,10 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-
 
 ```bash
 # Monitorar status do replication group
-aws elasticache describe-replication-groups --replication-group-id lab-cluster-enabled-$SEU_ID --region us-east-2
+aws elasticache describe-replication-groups --replication-group-id lab-cluster-enabled-$ID --region us-east-2
 
 # Aguardar até status "available"
-watch -n 30 "aws elasticache describe-replication-groups --replication-group-id lab-cluster-enabled-$SEU_ID --query 'ReplicationGroups[0].Status' --output text --region us-east-2"
+watch -n 30 "aws elasticache describe-replication-groups --replication-group-id lab-cluster-enabled-$ID --query 'ReplicationGroups[0].Status' --output text --region us-east-2"
 ```
 
 #### Passo 3: Analisar Estrutura Distribuída
@@ -254,11 +254,11 @@ Quando disponível:
 
 ```bash
 # Endpoint de configuração
-ENDPOINT_ENABLED=$(aws elasticache describe-replication-groups --replication-group-id lab-cluster-enabled-$SEU_ID --query 'ReplicationGroups[0].ConfigurationEndpoint.Address' --output text --region us-east-2)
+ENDPOINT_ENABLED=$(aws elasticache describe-replication-groups --replication-group-id lab-cluster-enabled-$ID --query 'ReplicationGroups[0].ConfigurationEndpoint.Address' --output text --region us-east-2)
 echo "Configuration Endpoint: $ENDPOINT_ENABLED"
 
 # Analisar node groups (shards)
-aws elasticache describe-replication-groups --replication-group-id lab-cluster-enabled-$SEU_ID --query 'ReplicationGroups[0].NodeGroups' --region us-east-2
+aws elasticache describe-replication-groups --replication-group-id lab-cluster-enabled-$ID --query 'ReplicationGroups[0].NodeGroups' --region us-east-2
 ```
 
 **Características do Modo Enabled:**
@@ -305,23 +305,23 @@ aws elasticache describe-replication-groups --replication-group-id lab-cluster-e
 ```bash
 # Para Cluster Mode Disabled
 redis-cli -h $ENDPOINT_DISABLED -p 6379 ping
-redis-cli -h $ENDPOINT_DISABLED -p 6379 set "test-$SEU_ID" "Hello from $SEU_ID"
-redis-cli -h $ENDPOINT_DISABLED -p 6379 get "test-$SEU_ID"
+redis-cli -h $ENDPOINT_DISABLED -p 6379 set "test-$ID" "Hello from $ID"
+redis-cli -h $ENDPOINT_DISABLED -p 6379 get "test-$ID"
 
 # Para Cluster Mode Enabled (modo cluster)
 redis-cli -h $ENDPOINT_ENABLED -p 6379 -c ping
-redis-cli -h $ENDPOINT_ENABLED -p 6379 -c set "test-cluster-$SEU_ID" "Hello cluster from $SEU_ID"
-redis-cli -h $ENDPOINT_ENABLED -p 6379 -c get "test-cluster-$SEU_ID"
+redis-cli -h $ENDPOINT_ENABLED -p 6379 -c set "test-cluster-$ID" "Hello cluster from $ID"
+redis-cli -h $ENDPOINT_ENABLED -p 6379 -c get "test-cluster-$ID"
 ```
 
 ### Comparando Informações dos Clusters
 
 ```bash
 # Informações detalhadas do cluster disabled
-aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$SEU_ID --show-cache-node-info --region us-east-2
+aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --show-cache-node-info --region us-east-2
 
 # Informações detalhadas do cluster enabled
-aws elasticache describe-replication-groups --replication-group-id lab-cluster-enabled-$SEU_ID --region us-east-2
+aws elasticache describe-replication-groups --replication-group-id lab-cluster-enabled-$ID --region us-east-2
 ```
 
 ## 💰 Atenção aos Custos
@@ -340,19 +340,19 @@ aws elasticache describe-replication-groups --replication-group-id lab-cluster-e
 
 ### Via Console Web:
 1. **ElastiCache** > **Redis clusters**
-   - Delete `lab-cluster-disabled-{SEU_ID}`
-   - Delete `lab-cluster-enabled-{SEU_ID}`
+   - Delete `lab-cluster-disabled-$ID`
+   - Delete `lab-cluster-enabled-$ID`
 2. **EC2** > **Security Groups**
-   - Delete `elasticache-lab-sg-{SEU_ID}`
+   - Delete `elasticache-lab-sg-$ID`
 
 ### Via CLI:
 ```bash
 # Deletar clusters
-aws elasticache delete-cache-cluster --cache-cluster-id lab-cluster-disabled-$SEU_ID --region us-east-2
-aws elasticache delete-replication-group --replication-group-id lab-cluster-enabled-$SEU_ID --region us-east-2
+aws elasticache delete-cache-cluster --cache-cluster-id lab-cluster-disabled-$ID --region us-east-2
+aws elasticache delete-replication-group --replication-group-id lab-cluster-enabled-$ID --region us-east-2
 
 # Aguardar deleção dos clusters antes de deletar Security Group
-aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$SEU_ID --region us-east-2
+aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --region us-east-2
 # Quando retornar erro "CacheClusterNotFound", pode deletar o SG
 
 # Deletar Security Group

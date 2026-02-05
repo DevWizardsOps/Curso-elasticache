@@ -47,8 +47,8 @@ lab02-simulando-failover/
 ## 🏷️ Convenção de Nomenclatura
 
 Todos os recursos criados devem seguir o padrão:
-- **Replication Group:** `lab-failover-{SEU_ID}`
-- **Security Groups:** Reutilizar `elasticache-lab-sg-{SEU_ID}` do Lab 01
+- **Replication Group:** `lab-failover-$ID`
+- **Security Groups:** Reutilizar `elasticache-lab-sg-$ID` do Lab 01
 
 **Exemplo para aluno01:**
 - Replication Group: `lab-failover-aluno01`
@@ -64,14 +64,14 @@ Todos os recursos criados devem seguir o padrão:
 
 ```bash
 # Definir seu ID (ALTERE AQUI)
-SEU_ID="aluno01"
+ID="aluno01"
 
 # Verificar região
 aws configure get region
 # Deve retornar: us-east-2
 
 # Verificar Security Group do Lab 01
-aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$SEU_ID" --region us-east-2
+aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --region us-east-2
 ```
 
 #### Passo 2: Criar Replication Group via Console Web
@@ -81,8 +81,8 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
 3. Configure:
    - **Cluster mode:** Disabled (para simplicidade do failover)
    - **Cluster info:**
-     - **Name:** `lab-failover-{SEU_ID}`
-     - **Description:** `Lab failover cluster for {SEU_ID}`
+     - **Name:** `lab-failover-$ID`
+     - **Description:** `Lab failover cluster for $ID`
    - **Location:**
      - **AWS Cloud**
      - **Multi-AZ:** **Enabled** (essencial para failover)
@@ -94,7 +94,7 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
    - **Connectivity:**
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
-     - **Security groups:** Selecione seu SG `elasticache-lab-sg-{SEU_ID}`
+     - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
    - **Backup:**
      - **Enable automatic backups:** Enabled
    - **Maintenance:**
@@ -106,27 +106,27 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
 
 ```bash
 # Monitorar status do replication group
-aws elasticache describe-replication-groups --replication-group-id lab-failover-$SEU_ID --region us-east-2
+aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --region us-east-2
 
 # Aguardar até status "available" (pode levar 15-20 minutos)
-watch -n 30 "aws elasticache describe-replication-groups --replication-group-id lab-failover-$SEU_ID --query 'ReplicationGroups[0].Status' --output text --region us-east-2"
+watch -n 30 "aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].Status' --output text --region us-east-2"
 ```
 
 #### Passo 4: Identificar Topologia do Cluster
 
 ```bash
 # Obter informações detalhadas
-aws elasticache describe-replication-groups --replication-group-id lab-failover-$SEU_ID --region us-east-2
+aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --region us-east-2
 
 # Identificar nó primário e réplicas
-aws elasticache describe-replication-groups --replication-group-id lab-failover-$SEU_ID --query 'ReplicationGroups[0].NodeGroups[0].NodeGroupMembers' --region us-east-2
+aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].NodeGroups[0].NodeGroupMembers' --region us-east-2
 
 # Obter endpoint primário
-PRIMARY_ENDPOINT=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$SEU_ID --query 'ReplicationGroups[0].NodeGroups[0].PrimaryEndpoint.Address' --output text --region us-east-2)
+PRIMARY_ENDPOINT=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].NodeGroups[0].PrimaryEndpoint.Address' --output text --region us-east-2)
 echo "Primary Endpoint: $PRIMARY_ENDPOINT"
 
 # Obter endpoint de leitura
-READER_ENDPOINT=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$SEU_ID --query 'ReplicationGroups[0].NodeGroups[0].ReaderEndpoint.Address' --output text --region us-east-2)
+READER_ENDPOINT=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].NodeGroups[0].ReaderEndpoint.Address' --output text --region us-east-2)
 echo "Reader Endpoint: $READER_ENDPOINT"
 ```
 
@@ -156,22 +156,22 @@ redis-cli -h $PRIMARY_ENDPOINT -p 6379 info replication
 ```bash
 # Inserir dados de teste no primário
 redis-cli -h $PRIMARY_ENDPOINT -p 6379 << EOF
-SET "user:$SEU_ID:1" "João Silva"
-SET "user:$SEU_ID:2" "Maria Santos"
-SET "user:$SEU_ID:3" "Pedro Costa"
-HSET "session:$SEU_ID:abc123" user_id 1 login_time "$(date)" ip "192.168.1.100"
-HSET "session:$SEU_ID:def456" user_id 2 login_time "$(date)" ip "192.168.1.101"
-LPUSH "events:$SEU_ID" "user_login:1" "user_login:2" "page_view:home"
-SET "counter:$SEU_ID:visits" 1000
-INCR "counter:$SEU_ID:visits"
+SET "user:$ID:1" "João Silva"
+SET "user:$ID:2" "Maria Santos"
+SET "user:$ID:3" "Pedro Costa"
+HSET "session:$ID:abc123" user_id 1 login_time "$(date)" ip "192.168.1.100"
+HSET "session:$ID:def456" user_id 2 login_time "$(date)" ip "192.168.1.101"
+LPUSH "events:$ID" "user_login:1" "user_login:2" "page_view:home"
+SET "counter:$ID:visits" 1000
+INCR "counter:$ID:visits"
 EOF
 
 # Verificar dados inseridos
 redis-cli -h $PRIMARY_ENDPOINT -p 6379 << EOF
-GET "user:$SEU_ID:1"
-HGETALL "session:$SEU_ID:abc123"
-LRANGE "events:$SEU_ID" 0 -1
-GET "counter:$SEU_ID:visits"
+GET "user:$ID:1"
+HGETALL "session:$ID:abc123"
+LRANGE "events:$ID" 0 -1
+GET "counter:$ID:visits"
 EOF
 ```
 
@@ -180,8 +180,8 @@ EOF
 ```bash
 # Ler dados das réplicas (deve ser idêntico)
 redis-cli -h $READER_ENDPOINT -p 6379 << EOF
-GET "user:$SEU_ID:1"
-GET "counter:$SEU_ID:visits"
+GET "user:$ID:1"
+GET "counter:$ID:visits"
 EOF
 
 # Tentar escrever na réplica (deve falhar)
@@ -200,18 +200,18 @@ redis-cli -h $READER_ENDPOINT -p 6379 SET "test:write" "should fail" || echo "�
 
 ```bash
 # Obter ID do nó primário atual
-CURRENT_PRIMARY=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$SEU_ID --query 'ReplicationGroups[0].NodeGroups[0].NodeGroupMembers[?CurrentRole==`primary`].CacheClusterId' --output text --region us-east-2)
+CURRENT_PRIMARY=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].NodeGroups[0].NodeGroupMembers[?CurrentRole==`primary`].CacheClusterId' --output text --region us-east-2)
 echo "Nó Primário Atual: $CURRENT_PRIMARY"
 
 # Obter AZ do primário atual
-CURRENT_PRIMARY_AZ=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$SEU_ID --query 'ReplicationGroups[0].NodeGroups[0].NodeGroupMembers[?CurrentRole==`primary`].PreferredAvailabilityZone' --output text --region us-east-2)
+CURRENT_PRIMARY_AZ=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].NodeGroups[0].NodeGroupMembers[?CurrentRole==`primary`].PreferredAvailabilityZone' --output text --region us-east-2)
 echo "AZ do Primário: $CURRENT_PRIMARY_AZ"
 ```
 
 #### Passo 2: Iniciar Failover via Console Web
 
 1. Acesse **ElastiCache** > **Redis clusters**
-2. Selecione seu cluster `lab-failover-{SEU_ID}`
+2. Selecione seu cluster `lab-failover-$ID`
 3. Clique em **Actions** > **Failover primary**
 4. Na janela de confirmação:
    - Verifique o nó primário atual
@@ -227,18 +227,18 @@ for i in {1..20}; do
     echo "=== Verificação $i ($(date)) ==="
     
     # Status do replication group
-    STATUS=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$SEU_ID --query 'ReplicationGroups[0].Status' --output text --region us-east-2)
+    STATUS=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].Status' --output text --region us-east-2)
     echo "Status do Cluster: $STATUS"
     
     # Identificar novo primário
-    NEW_PRIMARY=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$SEU_ID --query 'ReplicationGroups[0].NodeGroups[0].NodeGroupMembers[?CurrentRole==`primary`].CacheClusterId' --output text --region us-east-2)
+    NEW_PRIMARY=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].NodeGroups[0].NodeGroupMembers[?CurrentRole==`primary`].CacheClusterId' --output text --region us-east-2)
     echo "Nó Primário: $NEW_PRIMARY"
     
     # Testar conectividade
     if redis-cli -h $PRIMARY_ENDPOINT -p 6379 ping > /dev/null 2>&1; then
         echo "✅ Conectividade: OK"
         # Testar leitura de dados
-        COUNTER_VALUE=$(redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "counter:$SEU_ID:visits" 2>/dev/null)
+        COUNTER_VALUE=$(redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "counter:$ID:visits" 2>/dev/null)
         echo "Contador de visitas: $COUNTER_VALUE"
     else
         echo "❌ Conectividade: FALHOU"
@@ -254,21 +254,21 @@ done
 ```bash
 # Comparar primário antes e depois
 echo "Primário Original: $CURRENT_PRIMARY"
-NEW_PRIMARY_FINAL=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$SEU_ID --query 'ReplicationGroups[0].NodeGroups[0].NodeGroupMembers[?CurrentRole==`primary`].CacheClusterId' --output text --region us-east-2)
+NEW_PRIMARY_FINAL=$(aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].NodeGroups[0].NodeGroupMembers[?CurrentRole==`primary`].CacheClusterId' --output text --region us-east-2)
 echo "Novo Primário: $NEW_PRIMARY_FINAL"
 
 # Verificar integridade dos dados
 echo "=== Verificação de Integridade dos Dados ==="
 redis-cli -h $PRIMARY_ENDPOINT -p 6379 << EOF
-GET "user:$SEU_ID:1"
-HGETALL "session:$SEU_ID:abc123"
-LRANGE "events:$SEU_ID" 0 -1
-GET "counter:$SEU_ID:visits"
+GET "user:$ID:1"
+HGETALL "session:$ID:abc123"
+LRANGE "events:$ID" 0 -1
+GET "counter:$ID:visits"
 EOF
 
 # Testar nova escrita
-redis-cli -h $PRIMARY_ENDPOINT -p 6379 SET "failover:test:$SEU_ID" "Failover completed at $(date)"
-redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "failover:test:$SEU_ID"
+redis-cli -h $PRIMARY_ENDPOINT -p 6379 SET "failover:test:$ID" "Failover completed at $(date)"
+redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "failover:test:$ID"
 ```
 
 **✅ Checkpoint:** Failover deve ter sido concluído com novo primário e dados íntegros.
@@ -283,7 +283,7 @@ redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "failover:test:$SEU_ID"
 
 ```bash
 # Listar eventos recentes do cluster
-aws elasticache describe-events --source-identifier lab-failover-$SEU_ID --source-type replication-group --start-time $(date -d '1 hour ago' -u +%Y-%m-%dT%H:%M:%S) --region us-east-2
+aws elasticache describe-events --source-identifier lab-failover-$ID --source-type replication-group --start-time $(date -d '1 hour ago' -u +%Y-%m-%dT%H:%M:%S) --region us-east-2
 ```
 
 #### Passo 2: Acessar Métricas via Console Web
@@ -421,17 +421,17 @@ if __name__ == "__main__":
 
 ### Via Console Web:
 1. **ElastiCache** > **Redis clusters**
-   - Selecione `lab-failover-{SEU_ID}`
+   - Selecione `lab-failover-$ID`
    - **Actions** > **Delete**
    - Confirme a deleção
 
 ### Via CLI:
 ```bash
 # Deletar replication group
-aws elasticache delete-replication-group --replication-group-id lab-failover-$SEU_ID --region us-east-2
+aws elasticache delete-replication-group --replication-group-id lab-failover-$ID --region us-east-2
 
 # Monitorar deleção
-watch -n 30 "aws elasticache describe-replication-groups --replication-group-id lab-failover-$SEU_ID --region us-east-2 2>/dev/null || echo 'Cluster deletado com sucesso'"
+watch -n 30 "aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --region us-east-2 2>/dev/null || echo 'Cluster deletado com sucesso'"
 ```
 
 **NOTA:** Mantenha o Security Group do Lab 01 para uso nos próximos laboratórios.

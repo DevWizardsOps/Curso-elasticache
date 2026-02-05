@@ -148,7 +148,7 @@ redis-cli -h ENDPOINT -p 6379 memory stats
 ```bash
 # Alerta de CPU Alto
 aws cloudwatch put-metric-alarm \
-    --alarm-name "ElastiCache-HighCPU-SEU_ID" \
+    --alarm-name "ElastiCache-HighCPU-ID" \
     --alarm-description "High CPU utilization on ElastiCache cluster" \
     --metric-name CPUUtilization \
     --namespace AWS/ElastiCache \
@@ -162,7 +162,7 @@ aws cloudwatch put-metric-alarm \
 
 # Alerta de Uso de Swap (CRÍTICO)
 aws cloudwatch put-metric-alarm \
-    --alarm-name "ElastiCache-SwapUsage-SEU_ID" \
+    --alarm-name "ElastiCache-SwapUsage-ID" \
     --alarm-description "CRITICAL: Swap usage detected on ElastiCache cluster" \
     --metric-name SwapUsage \
     --namespace AWS/ElastiCache \
@@ -176,7 +176,7 @@ aws cloudwatch put-metric-alarm \
 
 # Alerta de Memória Alta
 aws cloudwatch put-metric-alarm \
-    --alarm-name "ElastiCache-HighMemory-SEU_ID" \
+    --alarm-name "ElastiCache-HighMemory-ID" \
     --alarm-description "High memory usage on ElastiCache cluster" \
     --metric-name DatabaseMemoryUsagePercentage \
     --namespace AWS/ElastiCache \

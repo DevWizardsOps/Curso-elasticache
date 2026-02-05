@@ -2,20 +2,20 @@
 
 # Script de referência para monitorar failover em tempo real
 # Região: us-east-2
-# Uso: ./monitor-failover.sh <SEU_ID>
+# Uso: ./monitor-failover.sh <ID>
 
 set -e
 
 # Verificar parâmetros
 if [ $# -ne 1 ]; then
-    echo "Uso: $0 <SEU_ID>"
+    echo "Uso: $0 <ID>"
     echo "Exemplo: $0 aluno01"
     exit 1
 fi
 
-SEU_ID=$1
+ID=$1
 REGION="us-east-2"
-REPLICATION_GROUP_ID="lab-failover-$SEU_ID"
+REPLICATION_GROUP_ID="lab-failover-$ID"
 
 echo "🔍 Monitorando failover para $REPLICATION_GROUP_ID"
 echo "Região: $REGION"
@@ -57,7 +57,7 @@ test_connectivity() {
 
 # Função para obter valor de teste
 get_test_value() {
-    timeout 5 redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "counter:$SEU_ID:visits" 2>/dev/null || echo "N/A"
+    timeout 5 redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "counter:$ID:visits" 2>/dev/null || echo "N/A"
 }
 
 # Obter primário inicial
@@ -113,8 +113,8 @@ while true; do
         echo "🔍 Verificando integridade dos dados..."
         sleep 5
         
-        USER_DATA=$(timeout 10 redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "user:$SEU_ID:1" 2>/dev/null || echo "N/A")
-        COUNTER_DATA=$(timeout 10 redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "counter:$SEU_ID:visits" 2>/dev/null || echo "N/A")
+        USER_DATA=$(timeout 10 redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "user:$ID:1" 2>/dev/null || echo "N/A")
+        COUNTER_DATA=$(timeout 10 redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "counter:$ID:visits" 2>/dev/null || echo "N/A")
         
         echo "Usuário de teste: $USER_DATA"
         echo "Contador: $COUNTER_DATA"

@@ -2,23 +2,23 @@
 
 # Script de referência para simular hot keys
 # Região: us-east-2
-# Uso: ./simulate-hot-keys.sh <SEU_ID> <ENDPOINT> [DURATION]
+# Uso: ./simulate-hot-keys.sh <ID> <ENDPOINT> [DURATION]
 
 set -e
 
 # Verificar parâmetros
 if [ $# -lt 2 ]; then
-    echo "Uso: $0 <SEU_ID> <ENDPOINT> [DURATION_SECONDS]"
+    echo "Uso: $0 <ID> <ENDPOINT> [DURATION_SECONDS]"
     echo "Exemplo: $0 aluno01 lab-data-aluno01.abc123.cache.amazonaws.com 300"
     exit 1
 fi
 
-SEU_ID=$1
+ID=$1
 ENDPOINT=$2
 DURATION=${3:-300}  # Default: 5 minutos
 
 echo "🔥 Simulando hot keys no cluster..."
-echo "ID do Aluno: $SEU_ID"
+echo "ID do Aluno: $ID"
 echo "Endpoint: $ENDPOINT"
 echo "Duração: $DURATION segundos"
 
@@ -34,15 +34,15 @@ echo "✅ Conectividade OK"
 echo "📊 Preparando dados para simulação de hot keys..."
 redis-cli -h $ENDPOINT -p 6379 << EOF
 # Criar chaves candidatas a hot keys
-$(for i in {1..100}; do echo "SET hot_candidate:$SEU_ID:$i hotvalue$i"; done)
+$(for i in {1..100}; do echo "SET hot_candidate:$ID:$i hotvalue$i"; done)
 
 # Criar algumas chaves com dados maiores
-SET hot_big:$SEU_ID:1 "$(printf 'A%.0s' {1..10240})"
-SET hot_big:$SEU_ID:2 "$(printf 'B%.0s' {1..10240})"
+SET hot_big:$ID:1 "$(printf 'A%.0s' {1..10240})"
+SET hot_big:$ID:2 "$(printf 'B%.0s' {1..10240})"
 
 # Criar estruturas que podem ser hot keys
-$(for i in {1..1000}; do echo "HSET hot_hash:$SEU_ID field$i value$i"; done)
-$(for i in {1..500}; do echo "LPUSH hot_list:$SEU_ID item$i"; done)
+$(for i in {1..1000}; do echo "HSET hot_hash:$ID field$i value$i"; done)
+$(for i in {1..500}; do echo "LPUSH hot_list:$ID item$i"; done)
 EOF
 
 echo "✅ Dados preparados"
@@ -235,10 +235,10 @@ analyze_performance_impact() {
 echo "🚀 Iniciando simulação completa de hot keys..."
 
 # Executar simulação e monitoramento em paralelo
-simulate_hot_key_pattern $ENDPOINT $SEU_ID $DURATION &
+simulate_hot_key_pattern $ENDPOINT $ID $DURATION &
 SIMULATION_PID=$!
 
-monitor_hot_keys $ENDPOINT $SEU_ID $DURATION &
+monitor_hot_keys $ENDPOINT $ID $DURATION &
 MONITOR_PID=$!
 
 # Aguardar conclusão
@@ -246,7 +246,7 @@ wait $SIMULATION_PID
 wait $MONITOR_PID
 
 # Analisar impacto na performance
-analyze_performance_impact $ENDPOINT $SEU_ID
+analyze_performance_impact $ENDPOINT $ID
 
 # Verificar slow log
 echo ""
@@ -276,4 +276,4 @@ echo "3. Implementar sharding manual"
 echo "4. Considerar cluster mode enabled"
 echo ""
 echo "🧹 Limpeza:"
-echo "rm -f /tmp/hot_keys_monitor_$SEU_ID.txt"
+echo "rm -f /tmp/hot_keys_monitor_$ID.txt"

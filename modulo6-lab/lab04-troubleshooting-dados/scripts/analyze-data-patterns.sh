@@ -2,22 +2,22 @@
 
 # Script de referência para analisar padrões de dados
 # Região: us-east-2
-# Uso: ./analyze-data-patterns.sh <SEU_ID> <ENDPOINT>
+# Uso: ./analyze-data-patterns.sh <ID> <ENDPOINT>
 
 set -e
 
 # Verificar parâmetros
 if [ $# -ne 2 ]; then
-    echo "Uso: $0 <SEU_ID> <ENDPOINT>"
+    echo "Uso: $0 <ID> <ENDPOINT>"
     echo "Exemplo: $0 aluno01 lab-data-aluno01.abc123.cache.amazonaws.com"
     exit 1
 fi
 
-SEU_ID=$1
+ID=$1
 ENDPOINT=$2
 
 echo "🔍 Analisando padrões de dados no cluster..."
-echo "ID do Aluno: $SEU_ID"
+echo "ID do Aluno: $ID"
 echo "Endpoint: $ENDPOINT"
 
 # Verificar conectividade
@@ -99,17 +99,17 @@ analyze_big_keys() {
     echo "====================="
     
     echo "Executando análise de big keys (pode demorar)..."
-    redis-cli -h $ENDPOINT -p 6379 --bigkeys > /tmp/bigkeys_analysis_$SEU_ID.txt
+    redis-cli -h $ENDPOINT -p 6379 --bigkeys > /tmp/bigkeys_analysis_$ID.txt
     
     echo ""
     echo "=== Resumo de Big Keys ==="
-    grep -A 20 "Biggest" /tmp/bigkeys_analysis_$SEU_ID.txt
+    grep -A 20 "Biggest" /tmp/bigkeys_analysis_$ID.txt
     
     echo ""
     echo "=== Análise Detalhada de Memory Usage ==="
     
     # Analisar chaves específicas do laboratório
-    local patterns=("big_string:$SEU_ID:*" "big_list:$SEU_ID:*" "big_hash:$SEU_ID:*" "big_set:$SEU_ID:*")
+    local patterns=("big_string:$ID:*" "big_list:$ID:*" "big_hash:$ID:*" "big_set:$ID:*")
     
     for pattern in "${patterns[@]}"; do
         echo ""
@@ -162,11 +162,11 @@ analyze_hot_keys() {
     redis-cli -h $ENDPOINT -p 6379 slowlog get 10
     
     # Se houver dados de monitoramento anterior
-    if [ -f "/tmp/hot_keys_monitor_$SEU_ID.txt" ]; then
+    if [ -f "/tmp/hot_keys_monitor_$ID.txt" ]; then
         echo ""
         echo "=== Análise de Dados de Monitoramento Anterior ==="
         echo "Top 5 chaves mais acessadas:"
-        grep -o "hot_candidate:$SEU_ID:[0-9]*" /tmp/hot_keys_monitor_$SEU_ID.txt | sort | uniq -c | sort -nr | head -5
+        grep -o "hot_candidate:$ID:[0-9]*" /tmp/hot_keys_monitor_$ID.txt | sort | uniq -c | sort -nr | head -5
     fi
 }
 
@@ -182,21 +182,21 @@ analyze_structure_efficiency() {
     # Criar dados de teste para comparação
     redis-cli -h $ENDPOINT -p 6379 << EOF
 # Abordagem eficiente: Hash
-HSET user_efficient:$SEU_ID:1 name "João" email "joao@test.com" age "30" city "São Paulo"
+HSET user_efficient:$ID:1 name "João" email "joao@test.com" age "30" city "São Paulo"
 
 # Abordagem ineficiente: Múltiplas strings
-SET user_inefficient:$SEU_ID:1:name "João"
-SET user_inefficient:$SEU_ID:1:email "joao@test.com"
-SET user_inefficient:$SEU_ID:1:age "30"
-SET user_inefficient:$SEU_ID:1:city "São Paulo"
+SET user_inefficient:$ID:1:name "João"
+SET user_inefficient:$ID:1:email "joao@test.com"
+SET user_inefficient:$ID:1:age "30"
+SET user_inefficient:$ID:1:city "São Paulo"
 EOF
     
     # Comparar uso de memória
-    local hash_memory=$(redis-cli -h $ENDPOINT -p 6379 memory usage user_efficient:$SEU_ID:1)
-    local string1_memory=$(redis-cli -h $ENDPOINT -p 6379 memory usage user_inefficient:$SEU_ID:1:name)
-    local string2_memory=$(redis-cli -h $ENDPOINT -p 6379 memory usage user_inefficient:$SEU_ID:1:email)
-    local string3_memory=$(redis-cli -h $ENDPOINT -p 6379 memory usage user_inefficient:$SEU_ID:1:age)
-    local string4_memory=$(redis-cli -h $ENDPOINT -p 6379 memory usage user_inefficient:$SEU_ID:1:city)
+    local hash_memory=$(redis-cli -h $ENDPOINT -p 6379 memory usage user_efficient:$ID:1)
+    local string1_memory=$(redis-cli -h $ENDPOINT -p 6379 memory usage user_inefficient:$ID:1:name)
+    local string2_memory=$(redis-cli -h $ENDPOINT -p 6379 memory usage user_inefficient:$ID:1:email)
+    local string3_memory=$(redis-cli -h $ENDPOINT -p 6379 memory usage user_inefficient:$ID:1:age)
+    local string4_memory=$(redis-cli -h $ENDPOINT -p 6379 memory usage user_inefficient:$ID:1:city)
     local strings_total=$((string1_memory + string2_memory + string3_memory + string4_memory))
     
     echo "Hash (eficiente): $hash_memory bytes"
@@ -280,7 +280,7 @@ generate_recommendations() {
     fi
     
     # Verificar big keys
-    if grep -q "Biggest" /tmp/bigkeys_analysis_$SEU_ID.txt; then
+    if grep -q "Biggest" /tmp/bigkeys_analysis_$ID.txt; then
         echo "⚠️  BIG KEYS DETECTADAS"
         echo "   → Use paginação para operações em big keys"
         echo "   → Considere quebrar big keys em estruturas menores"
@@ -328,16 +328,16 @@ generate_recommendations
 echo ""
 echo "🧹 Limpando dados de teste temporários..."
 redis-cli -h $ENDPOINT -p 6379 << EOF
-DEL user_efficient:$SEU_ID:1
-DEL user_inefficient:$SEU_ID:1:name
-DEL user_inefficient:$SEU_ID:1:email
-DEL user_inefficient:$SEU_ID:1:age
-DEL user_inefficient:$SEU_ID:1:city
+DEL user_efficient:$ID:1
+DEL user_inefficient:$ID:1:name
+DEL user_inefficient:$ID:1:email
+DEL user_inefficient:$ID:1:age
+DEL user_inefficient:$ID:1:city
 EOF
 
 echo ""
 echo "📄 Relatório completo salvo em:"
-echo "   /tmp/bigkeys_analysis_$SEU_ID.txt"
+echo "   /tmp/bigkeys_analysis_$ID.txt"
 echo ""
 echo "🎯 Análise de Padrões de Dados Concluída!"
 echo "========================================"
