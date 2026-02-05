@@ -7,7 +7,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_STACK_NAME="curso-elasticache"
-DEFAULT_REGION="us-east-1"
+DEFAULT_REGION="us-east-2"
+AWS_PROFILE=""
 
 # Cores para output
 RED='\033[0;31m'
@@ -15,6 +16,15 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Função para executar comandos AWS com perfil
+aws_cmd() {
+    if [ -n "$AWS_PROFILE" ]; then
+        aws --profile "$AWS_PROFILE" "$@"
+    else
+        aws "$@"
+    fi
+}
 
 # Função para print colorido
 print_color() {
@@ -36,6 +46,7 @@ COMANDOS:
   stop        Para todas as instâncias EC2
   restart     Reinicia todas as instâncias EC2
   cleanup     Remove todo o ambiente (CUIDADO!)
+  force-clean Força limpeza de recursos problemáticos
   info        Mostra informações detalhadas
   connect     Conecta via SSH a uma instância
   logs        Mostra logs de uma instância
@@ -44,13 +55,15 @@ COMANDOS:
 OPÇÕES:
   -s, --stack NOME     Nome da stack (padrão: $DEFAULT_STACK_NAME)
   -r, --region REGIÃO  Região AWS (padrão: $DEFAULT_REGION)
+  -p, --profile PERFIL Perfil AWS a ser usado (opcional)
   -h, --help          Mostra esta ajuda
 
 EXEMPLOS:
   $0 status
   $0 start --stack meu-curso
-  $0 connect aluno01
-  $0 cleanup --stack curso-teste
+  $0 connect aluno01 --profile producao
+  $0 cleanup --stack curso-teste --region us-west-2
+  $0 status --profile dev --region us-east-1
 
 EOF
 }
@@ -59,14 +72,14 @@ EOF
 stack_exists() {
     local stack_name=$1
     local region=$2
-    aws cloudformation describe-stacks --stack-name "$stack_name" --region "$region" >/dev/null 2>&1
+    aws_cmd cloudformation describe-stacks --stack-name "$stack_name" --region "$region" >/dev/null 2>&1
 }
 
 # Função para obter status da stack
 get_stack_status() {
     local stack_name=$1
     local region=$2
-    aws cloudformation describe-stacks \
+    aws_cmd cloudformation describe-stacks \
         --stack-name "$stack_name" \
         --region "$region" \
         --query 'Stacks[0].StackStatus' \
@@ -77,7 +90,7 @@ get_stack_status() {
 get_instances() {
     local stack_name=$1
     local region=$2
-    aws cloudformation describe-stack-resources \
+    aws_cmd cloudformation describe-stack-resources \
         --stack-name "$stack_name" \
         --region "$region" \
         --query 'StackResources[?ResourceType==`AWS::EC2::Instance`].[LogicalResourceId,PhysicalResourceId]' \
@@ -94,7 +107,7 @@ get_instances_status() {
         return
     fi
     
-    aws ec2 describe-instances \
+    aws_cmd ec2 describe-instances \
         --instance-ids "${instance_ids[@]}" \
         --region "$region" \
         --query 'Reservations[*].Instances[*].[InstanceId,State.Name,PublicIpAddress,Tags[?Key==`Name`].Value|[0]]' \
@@ -197,7 +210,7 @@ cmd_start() {
     
     print_color $YELLOW "⏳ Iniciando ${#instance_ids[@]} instâncias..."
     
-    aws ec2 start-instances \
+    aws_cmd ec2 start-instances \
         --instance-ids "${instance_ids[@]}" \
         --region "$region" >/dev/null
     
@@ -235,7 +248,7 @@ cmd_stop() {
     
     print_color $YELLOW "⏳ Parando ${#instance_ids[@]} instâncias..."
     
-    aws ec2 stop-instances \
+    aws_cmd ec2 stop-instances \
         --instance-ids "${instance_ids[@]}" \
         --region "$region" >/dev/null
     
@@ -263,22 +276,40 @@ cmd_cleanup() {
         return 0
     fi
     
+    # Tentar limpar recursos problemáticos primeiro
+    print_color $YELLOW "🧹 Limpando recursos que podem causar problemas..."
+    
+    # Esvaziar buckets S3 se existirem
+    local account_id=$(aws_cmd sts get-caller-identity --query Account --output text --region "$region" 2>/dev/null)
+    if [ ! -z "$account_id" ]; then
+        local labs_bucket="curso-elasticache-labs-${account_id}"
+        local keys_bucket="curso-elasticache-keys-${account_id}"
+        local reports_bucket="curso-elasticache-reports-${account_id}"
+        
+        for bucket in "$labs_bucket" "$keys_bucket" "$reports_bucket"; do
+            if aws_cmd s3 ls "s3://$bucket" --region "$region" >/dev/null 2>&1; then
+                print_color $YELLOW "🪣 Esvaziando bucket: $bucket"
+                aws_cmd s3 rm "s3://$bucket" --recursive --region "$region" 2>/dev/null || true
+            fi
+        done
+    fi
+    
     print_color $YELLOW "⏳ Deletando stack CloudFormation..."
     
-    aws cloudformation delete-stack \
+    aws_cmd cloudformation delete-stack \
         --stack-name "$stack_name" \
         --region "$region"
     
     print_color $YELLOW "⏳ Aguardando deleção completa (pode levar alguns minutos)..."
     
-    if aws cloudformation wait stack-delete-complete --stack-name "$stack_name" --region "$region"; then
+    if aws_cmd cloudformation wait stack-delete-complete --stack-name "$stack_name" --region "$region"; then
         print_color $GREEN "✅ Stack deletada com sucesso"
         
         # Tentar deletar chave SSH
         local key_name="${stack_name}-key"
-        if aws ec2 describe-key-pairs --key-names "$key_name" --region "$region" >/dev/null 2>&1; then
+        if aws_cmd ec2 describe-key-pairs --key-names "$key_name" --region "$region" >/dev/null 2>&1; then
             print_color $YELLOW "🔑 Deletando chave SSH: $key_name"
-            aws ec2 delete-key-pair --key-name "$key_name" --region "$region"
+            aws_cmd ec2 delete-key-pair --key-name "$key_name" --region "$region"
             print_color $GREEN "✅ Chave SSH deletada"
         fi
         
@@ -286,15 +317,144 @@ cmd_cleanup() {
         rm -f "${key_name}.pem"
         rm -f "setup-curso-elasticache-dynamic.yaml"
         rm -f "alunos-ips.txt"
+        rm -f ".ssh-key-info"
+        rm -f "curso-elasticache-info-"*.html
         
         print_color $GREEN "🎉 Cleanup concluído!"
         print_color $BLUE "💰 Todos os custos foram interrompidos"
         
     else
         print_color $RED "❌ Erro na deleção da stack"
-        print_color $YELLOW "Verifique o console AWS para detalhes"
+        
+        # Mostrar eventos de erro detalhados
+        print_color $YELLOW "📋 Eventos de erro da stack:"
+        aws_cmd cloudformation describe-stack-events \
+            --stack-name "$stack_name" \
+            --region "$region" \
+            --query 'StackEvents[?ResourceStatus==`DELETE_FAILED`].[LogicalResourceId,ResourceType,ResourceStatusReason]' \
+            --output table 2>/dev/null || echo "Não foi possível obter eventos"
+        
+        echo ""
+        print_color $YELLOW "🔧 Possíveis soluções:"
+        echo "1. Alguns recursos podem ter dependências externas"
+        echo "2. Buckets S3 podem não estar vazios"
+        echo "3. Security Groups podem estar em uso"
+        echo "4. Instâncias podem ter volumes EBS anexados"
+        echo ""
+        print_color $BLUE "💡 Comandos para investigar:"
+        echo "# Ver status atual da stack:"
+        if [ -n "$AWS_PROFILE" ]; then
+            echo "aws cloudformation describe-stacks --stack-name $stack_name --region $region --profile $AWS_PROFILE"
+            echo ""
+            echo "# Ver eventos detalhados:"
+            echo "aws cloudformation describe-stack-events --stack-name $stack_name --region $region --profile $AWS_PROFILE"
+            echo ""
+            echo "# Tentar deletar novamente:"
+            echo "$0 cleanup --stack $stack_name --region $region --profile $AWS_PROFILE"
+        else
+            echo "aws cloudformation describe-stacks --stack-name $stack_name --region $region"
+            echo ""
+            echo "# Ver eventos detalhados:"
+            echo "aws cloudformation describe-stack-events --stack-name $stack_name --region $region"
+            echo ""
+            echo "# Tentar deletar novamente:"
+            echo "$0 cleanup --stack $stack_name --region $region"
+        fi
+        echo ""
+        print_color $YELLOW "🗑️  Para forçar limpeza manual:"
+        echo "1. Vá ao console AWS CloudFormation"
+        echo "2. Selecione a stack e clique em 'Delete'"
+        echo "3. Marque 'Retain' nos recursos que falharam"
+        echo "4. Delete os recursos manualmente depois"
+        
         return 1
     fi
+}
+
+# Comando: force-clean
+cmd_force_clean() {
+    local stack_name=$1
+    local region=$2
+    
+    print_color $RED "🧹 Limpeza Forçada de Recursos: $stack_name"
+    print_color $YELLOW "⚠️  Este comando tentará limpar recursos problemáticos"
+    echo ""
+    
+    read -p "Continuar com limpeza forçada? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        print_color $YELLOW "❌ Limpeza cancelada"
+        return 0
+    fi
+    
+    # Obter Account ID
+    local account_id=$(aws_cmd sts get-caller-identity --query Account --output text --region "$region" 2>/dev/null)
+    if [ -z "$account_id" ]; then
+        print_color $RED "❌ Não foi possível obter Account ID"
+        return 1
+    fi
+    
+    print_color $BLUE "🔍 Limpando recursos do curso ElastiCache..."
+    
+    # 1. Esvaziar e deletar buckets S3
+    local buckets=("curso-elasticache-labs-${account_id}" "curso-elasticache-keys-${account_id}" "curso-elasticache-reports-${account_id}" "curso-elasticache-templates-${account_id}")
+    
+    for bucket in "${buckets[@]}"; do
+        if aws_cmd s3 ls "s3://$bucket" --region "$region" >/dev/null 2>&1; then
+            print_color $YELLOW "🪣 Processando bucket: $bucket"
+            
+            # Esvaziar bucket
+            print_color $YELLOW "   Esvaziando conteúdo..."
+            aws_cmd s3 rm "s3://$bucket" --recursive --region "$region" 2>/dev/null || true
+            
+            # Deletar versões (se versionamento estiver habilitado)
+            aws_cmd s3api delete-objects --bucket "$bucket" --region "$region" \
+                --delete "$(aws_cmd s3api list-object-versions --bucket "$bucket" --region "$region" \
+                --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}')" 2>/dev/null || true
+            
+            # Deletar markers de deleção
+            aws_cmd s3api delete-objects --bucket "$bucket" --region "$region" \
+                --delete "$(aws_cmd s3api list-object-versions --bucket "$bucket" --region "$region" \
+                --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}')" 2>/dev/null || true
+            
+            # Deletar bucket
+            print_color $YELLOW "   Deletando bucket..."
+            aws_cmd s3 rb "s3://$bucket" --region "$region" 2>/dev/null || true
+            
+            print_color $GREEN "   ✅ Bucket processado"
+        fi
+    done
+    
+    # 2. Deletar chave SSH
+    local key_name="${stack_name}-key"
+    if aws_cmd ec2 describe-key-pairs --key-names "$key_name" --region "$region" >/dev/null 2>&1; then
+        print_color $YELLOW "🔑 Deletando chave SSH: $key_name"
+        aws_cmd ec2 delete-key-pair --key-name "$key_name" --region "$region" 2>/dev/null || true
+        print_color $GREEN "✅ Chave SSH processada"
+    fi
+    
+    # 3. Tentar deletar a stack novamente
+    if stack_exists "$stack_name" "$region"; then
+        print_color $YELLOW "📋 Tentando deletar stack novamente..."
+        aws_cmd cloudformation delete-stack --stack-name "$stack_name" --region "$region"
+        
+        print_color $YELLOW "⏳ Aguardando deleção (timeout: 10 minutos)..."
+        if timeout 600 aws_cmd cloudformation wait stack-delete-complete --stack-name "$stack_name" --region "$region" 2>/dev/null; then
+            print_color $GREEN "✅ Stack deletada com sucesso!"
+        else
+            print_color $YELLOW "⚠️  Stack ainda existe - pode precisar de intervenção manual"
+        fi
+    fi
+    
+    # 4. Limpar arquivos locais
+    print_color $YELLOW "🧹 Limpando arquivos locais..."
+    rm -f "${key_name}.pem"
+    rm -f "setup-curso-elasticache-dynamic.yaml"
+    rm -f "alunos-ips.txt"
+    rm -f ".ssh-key-info"
+    rm -f "curso-elasticache-info-"*.html
+    
+    print_color $GREEN "🎉 Limpeza forçada concluída!"
+    print_color $BLUE "💡 Se a stack ainda existir, delete-a manualmente no console AWS"
 }
 
 # Comando: connect
@@ -317,7 +477,7 @@ cmd_connect() {
     
     # Obter IP público do aluno
     local output_key="${aluno^}PublicIP"
-    local public_ip=$(aws cloudformation describe-stacks \
+    local public_ip=$(aws_cmd cloudformation describe-stacks \
         --stack-name "$stack_name" \
         --region "$region" \
         --query "Stacks[0].Outputs[?OutputKey=='$output_key'].OutputValue" \
@@ -358,7 +518,7 @@ cmd_info() {
     
     # Mostrar outputs da stack
     print_color $BLUE "📊 Outputs da Stack:"
-    aws cloudformation describe-stacks \
+    aws_cmd cloudformation describe-stacks \
         --stack-name "$stack_name" \
         --region "$region" \
         --query 'Stacks[0].Outputs[*].[OutputKey,OutputValue]' \
@@ -368,7 +528,7 @@ cmd_info() {
     
     # Mostrar recursos criados
     print_color $BLUE "🏗️  Recursos Criados:"
-    aws cloudformation describe-stack-resources \
+    aws_cmd cloudformation describe-stack-resources \
         --stack-name "$stack_name" \
         --region "$region" \
         --query 'StackResources[*].[ResourceType,LogicalResourceId,ResourceStatus]' \
@@ -391,11 +551,15 @@ while [[ $# -gt 0 ]]; do
             REGION="$2"
             shift 2
             ;;
+        -p|--profile)
+            AWS_PROFILE="$2"
+            shift 2
+            ;;
         -h|--help)
             show_help
             exit 0
             ;;
-        status|start|stop|restart|cleanup|info|connect|logs|costs)
+        status|start|stop|restart|cleanup|force-clean|info|connect|logs|costs)
             COMMAND="$1"
             shift
             ;;
@@ -414,10 +578,21 @@ if [ -z "$COMMAND" ]; then
     exit 1
 fi
 
+# Mostrar perfil sendo usado
+if [ -n "$AWS_PROFILE" ]; then
+    print_color $BLUE "🔧 Usando perfil AWS: $AWS_PROFILE"
+fi
+
 # Verificar se AWS CLI está configurado
-if ! aws sts get-caller-identity --region "$REGION" >/dev/null 2>&1; then
+if ! aws_cmd sts get-caller-identity --region "$REGION" >/dev/null 2>&1; then
     print_color $RED "❌ AWS CLI não configurado ou sem permissões"
-    echo "Execute: aws configure"
+    if [ -n "$AWS_PROFILE" ]; then
+        print_color $YELLOW "Verifique se o perfil '$AWS_PROFILE' existe e está configurado"
+        print_color $BLUE "Perfis disponíveis:"
+        aws configure list-profiles 2>/dev/null || echo "Nenhum perfil encontrado"
+    else
+        echo "Execute: aws configure"
+    fi
     exit 1
 fi
 
@@ -439,6 +614,9 @@ case $COMMAND in
         ;;
     cleanup)
         cmd_cleanup "$STACK_NAME" "$REGION"
+        ;;
+    force-clean)
+        cmd_force_clean "$STACK_NAME" "$REGION"
         ;;
     info)
         cmd_info "$STACK_NAME" "$REGION"

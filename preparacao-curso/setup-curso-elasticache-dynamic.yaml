@@ -1,22 +1,3 @@
-#!/bin/bash
-
-# Gerador de template CloudFormation dinâmico para curso ElastiCache
-# Baseado no padrão do curso DocumentDB
-
-NUM_ALUNOS=${1:-2}
-PREFIXO_ALUNO=${2:-aluno}
-
-if [ "$NUM_ALUNOS" -lt 1 ] || [ "$NUM_ALUNOS" -gt 20 ]; then
-    echo "❌ Erro: Número de alunos deve estar entre 1 e 20" >&2
-    exit 1
-fi
-
-# Função para gerar número com zero à esquerda
-pad_number() {
-    printf "%02d" "$1"
-}
-
-cat << 'EOF'
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Curso AWS ElastiCache - Ambiente automatizado para alunos'
 
@@ -165,43 +146,34 @@ Resources:
         - Key: Curso
           Value: ElastiCache
 
-EOF
-
-# Gerar recursos para cada aluno
-for i in $(seq 1 "$NUM_ALUNOS"); do
-    ALUNO_NUM=$(pad_number "$i")
-    ALUNO_ID="${PREFIXO_ALUNO}${ALUNO_NUM}"
-    ALUNO_ID_UPPER=$(echo "${ALUNO_ID}" | sed 's/./\U&/')
-    
-    cat << EOF
-  # Usuario IAM para ${ALUNO_ID}
-  ${ALUNO_ID_UPPER}User:
+  # Usuario IAM para aluno01
+  Ualuno01User:
     Type: AWS::IAM::User
     Properties:
-      UserName: curso-elasticache-${ALUNO_ID}
+      UserName: curso-elasticache-aluno01
       Groups:
         - !Ref CursoElastiCacheStudentsGroup
       LoginProfile:
-        Password: !Sub '{{resolve:secretsmanager:\${ConsolePasswordSecret}:SecretString:password}}'
+        Password: !Sub '{{resolve:secretsmanager:${ConsolePasswordSecret}:SecretString:password}}'
         PasswordResetRequired: false
       Tags:
         - Key: Aluno
-          Value: ${ALUNO_ID}
+          Value: aluno01
         - Key: Curso
           Value: ElastiCache
 
-  # Access Keys para ${ALUNO_ID}
-  ${ALUNO_ID_UPPER}AccessKey:
+  # Access Keys para aluno01
+  Ualuno01AccessKey:
     Type: AWS::IAM::AccessKey
     Properties:
-      UserName: !Ref ${ALUNO_ID_UPPER}User
+      UserName: !Ref Ualuno01User
 
-  # Instancia EC2 para ${ALUNO_ID}
-  ${ALUNO_ID_UPPER}Instance:
+  # Instancia EC2 para aluno01
+  Ualuno01Instance:
     Type: AWS::EC2::Instance
     DependsOn: 
       - LabsBucket
-      - ${ALUNO_ID_UPPER}InstanceProfile
+      - Ualuno01InstanceProfile
     Properties:
       ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
       InstanceType: t3.micro
@@ -209,13 +181,13 @@ for i in $(seq 1 "$NUM_ALUNOS"); do
       SubnetId: !Ref SubnetId
       SecurityGroupIds:
         - !Ref AlunosSecurityGroup
-      IamInstanceProfile: !Ref ${ALUNO_ID_UPPER}InstanceProfile
+      IamInstanceProfile: !Ref Ualuno01InstanceProfile
       UserData:
         Fn::Base64: !Sub 
           - |
             #!/bin/bash
             exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
-            echo "=== INICIANDO SETUP PARA ${ALUNO_ID} EM \$(date) ==="
+            echo "=== INICIANDO SETUP PARA aluno01 EM $(date) ==="
             
             # Aguardar conectividade com internet
             echo "Testando conectividade com internet..."
@@ -224,7 +196,7 @@ for i in $(seq 1 "$NUM_ALUNOS"); do
                 echo "✅ Internet acessível!"
                 break
               fi
-              echo "⏳ Tentativa \$i/30: Aguardando conectividade..."
+              echo "⏳ Tentativa $i/30: Aguardando conectividade..."
               sleep 10
             done
             
@@ -232,20 +204,20 @@ for i in $(seq 1 "$NUM_ALUNOS"); do
             echo "📥 Baixando script de setup do GitHub..."
             GITHUB_SCRIPT_URL="https://raw.githubusercontent.com/DevWizardsOps/Curso-elasticache/main/preparacao-curso/setup-aluno.sh"
             
-            if curl -fsSL "\$GITHUB_SCRIPT_URL" -o /tmp/setup-aluno.sh; then
+            if curl -fsSL "$GITHUB_SCRIPT_URL" -o /tmp/setup-aluno.sh; then
               echo "✅ Script baixado com sucesso do GitHub"
               chmod +x /tmp/setup-aluno.sh
               
-              echo "🚀 Executando setup para ${ALUNO_ID}..."
-              /tmp/setup-aluno.sh "${ALUNO_ID}" "\${AWS::Region}" "\${AccessKey}" "\${SecretKey}" >> /var/log/setup-aluno.log 2>&1
-              SETUP_EXIT_CODE=\$?
-              echo "✅ Setup concluído com código: \$SETUP_EXIT_CODE"
+              echo "🚀 Executando setup para aluno01..."
+              /tmp/setup-aluno.sh "aluno01" "${AWS::Region}" "${AccessKey}" "${SecretKey}" >> /var/log/setup-aluno.log 2>&1
+              SETUP_EXIT_CODE=$?
+              echo "✅ Setup concluído com código: $SETUP_EXIT_CODE"
               
               # Verificar se o usuário foi criado
-              if id "${ALUNO_ID}" &>/dev/null; then
-                echo "✅ Usuário ${ALUNO_ID} criado com sucesso"
+              if id "aluno01" &>/dev/null; then
+                echo "✅ Usuário aluno01 criado com sucesso"
               else
-                echo "❌ Falha ao criar usuário ${ALUNO_ID}"
+                echo "❌ Falha ao criar usuário aluno01"
                 SETUP_EXIT_CODE=1
               fi
             else
@@ -254,7 +226,7 @@ for i in $(seq 1 "$NUM_ALUNOS"); do
             fi
             
             # Se falhou, executar configuração básica de fallback
-            if [ \$SETUP_EXIT_CODE -ne 0 ]; then
+            if [ $SETUP_EXIT_CODE -ne 0 ]; then
               echo "🔄 Executando configuração básica de fallback..."
               yum update -y
               yum install -y git htop tree wget unzip jq bc redis6 redis6-doc --skip-broken
@@ -263,44 +235,44 @@ for i in $(seq 1 "$NUM_ALUNOS"); do
               
               # Criar estrutura básica
               mkdir -p /home/ec2-user/labs
-              echo "Ambiente básico configurado em \$(date)" > /home/ec2-user/labs/setup-status.txt
+              echo "Ambiente básico configurado em $(date)" > /home/ec2-user/labs/setup-status.txt
               echo "ERRO: Setup completo falhou, usando configuração básica" >> /home/ec2-user/labs/setup-status.txt
               chown -R ec2-user:ec2-user /home/ec2-user/labs
               
               # Tentar criar usuário básico
-              if ! id "${ALUNO_ID}" &>/dev/null; then
-                useradd -m -s /bin/bash ${ALUNO_ID} || true
-                echo "${ALUNO_ID} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers || true
+              if ! id "aluno01" &>/dev/null; then
+                useradd -m -s /bin/bash aluno01 || true
+                echo "aluno01 ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers || true
                 
                 # Copiar chave SSH
                 if [ -d "/home/ec2-user/.ssh" ]; then
-                  mkdir -p /home/${ALUNO_ID}/.ssh
-                  cp /home/ec2-user/.ssh/authorized_keys /home/${ALUNO_ID}/.ssh/authorized_keys || true
-                  chown -R ${ALUNO_ID}:${ALUNO_ID} /home/${ALUNO_ID}/.ssh || true
-                  chmod 700 /home/${ALUNO_ID}/.ssh || true
-                  chmod 600 /home/${ALUNO_ID}/.ssh/authorized_keys || true
+                  mkdir -p /home/aluno01/.ssh
+                  cp /home/ec2-user/.ssh/authorized_keys /home/aluno01/.ssh/authorized_keys || true
+                  chown -R aluno01:aluno01 /home/aluno01/.ssh || true
+                  chmod 700 /home/aluno01/.ssh || true
+                  chmod 600 /home/aluno01/.ssh/authorized_keys || true
                 fi
                 
                 # Configurar variável ID básica
-                echo "export ID=${ALUNO_ID}" >> /home/${ALUNO_ID}/.bashrc || true
-                chown ${ALUNO_ID}:${ALUNO_ID} /home/${ALUNO_ID}/.bashrc || true
+                echo "export ID=aluno01" >> /home/aluno01/.bashrc || true
+                chown aluno01:aluno01 /home/aluno01/.bashrc || true
               fi
               
               SETUP_EXIT_CODE=0  # Não falhar o CloudFormation por causa do fallback
             fi
             
-            echo "=== FINALIZANDO USER-DATA EM \$(date) ==="
-            echo "Código de saída final: \$SETUP_EXIT_CODE"
+            echo "=== FINALIZANDO USER-DATA EM $(date) ==="
+            echo "Código de saída final: $SETUP_EXIT_CODE"
             
             # Sinalizar conclusão para CloudFormation
-            /opt/aws/bin/cfn-signal -e \$SETUP_EXIT_CODE --stack \${AWS::StackName} --resource ${ALUNO_ID_UPPER}Instance --region \${AWS::Region}
-          - AccessKey: !Ref ${ALUNO_ID_UPPER}AccessKey
-            SecretKey: !GetAtt ${ALUNO_ID_UPPER}AccessKey.SecretAccessKey
+            /opt/aws/bin/cfn-signal -e $SETUP_EXIT_CODE --stack ${AWS::StackName} --resource Ualuno01Instance --region ${AWS::Region}
+          - AccessKey: !Ref Ualuno01AccessKey
+            SecretKey: !GetAtt Ualuno01AccessKey.SecretAccessKey
       Tags:
         - Key: Name
-          Value: curso-elasticache-${ALUNO_ID}
+          Value: curso-elasticache-aluno01
         - Key: Aluno
-          Value: ${ALUNO_ID}
+          Value: aluno01
         - Key: Curso
           Value: ElastiCache
     CreationPolicy:
@@ -308,11 +280,11 @@ for i in $(seq 1 "$NUM_ALUNOS"); do
         Count: 1
         Timeout: PT15M
 
-  # IAM Role para instancia EC2 do ${ALUNO_ID}
-  ${ALUNO_ID_UPPER}InstanceRole:
+  # IAM Role para instancia EC2 do aluno01
+  Ualuno01InstanceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: curso-elasticache-${ALUNO_ID}-role
+      RoleName: curso-elasticache-aluno01-role
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -332,27 +304,22 @@ for i in $(seq 1 "$NUM_ALUNOS"); do
                   - s3:GetObject
                   - s3:ListBucket
                 Resource:
-                  - !Sub 'arn:aws:s3:::curso-elasticache-labs-\${AWS::AccountId}'
-                  - !Sub 'arn:aws:s3:::curso-elasticache-labs-\${AWS::AccountId}/*'
+                  - !Sub 'arn:aws:s3:::curso-elasticache-labs-${AWS::AccountId}'
+                  - !Sub 'arn:aws:s3:::curso-elasticache-labs-${AWS::AccountId}/*'
       Tags:
         - Key: Aluno
-          Value: ${ALUNO_ID}
+          Value: aluno01
         - Key: Curso
           Value: ElastiCache
 
-  # Instance Profile para ${ALUNO_ID}
-  ${ALUNO_ID_UPPER}InstanceProfile:
+  # Instance Profile para aluno01
+  Ualuno01InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
-      InstanceProfileName: curso-elasticache-${ALUNO_ID}-profile
+      InstanceProfileName: curso-elasticache-aluno01-profile
       Roles:
-        - !Ref ${ALUNO_ID_UPPER}InstanceRole
+        - !Ref Ualuno01InstanceRole
 
-EOF
-done
-
-# Gerar outputs
-cat << 'EOF'
 
 Outputs:
   StackName:
@@ -395,44 +362,33 @@ Outputs:
     Description: Link para o Secrets Manager
     Value: !Sub 'https://console.aws.amazon.com/secretsmanager/home?region=${AWS::Region}#!/secret?name=${ConsolePasswordSecret}'
 
-EOF
-
-# Gerar outputs para cada aluno
-for i in $(seq 1 "$NUM_ALUNOS"); do
-    ALUNO_NUM=$(pad_number "$i")
-    ALUNO_ID="${PREFIXO_ALUNO}${ALUNO_NUM}"
-    ALUNO_ID_UPPER=$(echo "${ALUNO_ID}" | sed 's/./\U&/')
-    
-    cat << EOF
-  ${ALUNO_ID_UPPER}PublicIP:
-    Description: IP publico da instancia do ${ALUNO_ID}
-    Value: !GetAtt ${ALUNO_ID_UPPER}Instance.PublicIp
+  Ualuno01PublicIP:
+    Description: IP publico da instancia do aluno01
+    Value: !GetAtt Ualuno01Instance.PublicIp
     Export:
-      Name: !Sub '\${AWS::StackName}-${ALUNO_ID_UPPER}-Public-IP'
+      Name: !Sub '${AWS::StackName}-Ualuno01-Public-IP'
 
-  ${ALUNO_ID_UPPER}PrivateIP:
-    Description: IP privado da instancia do ${ALUNO_ID}
-    Value: !GetAtt ${ALUNO_ID_UPPER}Instance.PrivateIp
+  Ualuno01PrivateIP:
+    Description: IP privado da instancia do aluno01
+    Value: !GetAtt Ualuno01Instance.PrivateIp
     Export:
-      Name: !Sub '\${AWS::StackName}-${ALUNO_ID_UPPER}-Private-IP'
+      Name: !Sub '${AWS::StackName}-Ualuno01-Private-IP'
 
-  ${ALUNO_ID_UPPER}InstanceId:
-    Description: Instance ID do ${ALUNO_ID}
-    Value: !Ref ${ALUNO_ID_UPPER}Instance
+  Ualuno01InstanceId:
+    Description: Instance ID do aluno01
+    Value: !Ref Ualuno01Instance
     Export:
-      Name: !Sub '\${AWS::StackName}-${ALUNO_ID_UPPER}-Instance-ID'
+      Name: !Sub '${AWS::StackName}-Ualuno01-Instance-ID'
 
-  ${ALUNO_ID_UPPER}AccessKeyId:
-    Description: Access Key ID do ${ALUNO_ID}
-    Value: !Ref ${ALUNO_ID_UPPER}AccessKey
+  Ualuno01AccessKeyId:
+    Description: Access Key ID do aluno01
+    Value: !Ref Ualuno01AccessKey
     Export:
-      Name: !Sub '\${AWS::StackName}-${ALUNO_ID_UPPER}-Access-Key-ID'
+      Name: !Sub '${AWS::StackName}-Ualuno01-Access-Key-ID'
 
-  ${ALUNO_ID_UPPER}SecretAccessKey:
-    Description: Secret Access Key do ${ALUNO_ID}
-    Value: !GetAtt ${ALUNO_ID_UPPER}AccessKey.SecretAccessKey
+  Ualuno01SecretAccessKey:
+    Description: Secret Access Key do aluno01
+    Value: !GetAtt Ualuno01AccessKey.SecretAccessKey
     Export:
-      Name: !Sub '\${AWS::StackName}-${ALUNO_ID_UPPER}-Secret-Access-Key'
+      Name: !Sub '${AWS::StackName}-Ualuno01-Secret-Access-Key'
 
-EOF
-done
