@@ -81,6 +81,7 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
    - **Location:**
      - **AWS Cloud**
      - **Multi-AZ:** **Enabled** (essencial para failover)
+     - **Failover automático:** **Habilitado** (para demonstrar failover automático)
    - **Cluster settings:**
      - **Engine version:** 7.0
      - **Port:** 6379
@@ -90,12 +91,57 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
      - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
+   - **Security (Segurança):**
+     - **Criptografia em repouso:** Habilitada (recomendado)
+     - **Chave de criptografia:** Chave padrão (AWS managed)
+     - **Criptografia em trânsito:** Habilitada (recomendado)
+     - **Controle de acesso:** Nenhum controle de acesso (para simplicidade do lab)
    - **Backup:**
      - **Enable automatic backups:** Enabled
    - **Maintenance:**
      - **Auto minor version upgrade:** Enabled
+   - **Advanced settings:**
+     - **Tags (Recomendado):**
+       - **Key:** `Name` **Value:** `Lab Failover - $ID`
+       - **Key:** `Lab` **Value:** `Lab02`
+       - **Key:** `Purpose` **Value:** `Failover-Testing`
 
-4. Clique em **Create**
+6. Clique em **Create**
+
+> **📚 Para saber mais sobre segurança:**
+> - [Criptografia no ElastiCache](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
+> - [Multi-AZ para Redis](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Replication.Redis-RedisCluster.html)
+
+#### Alternativa: Criação Rápida via CLI
+
+Para acelerar o processo, você pode criar o cluster via CLI:
+
+```bash
+# Obter IDs necessários
+VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=ElastiCache-Lab-VPC" --query 'Vpcs[0].VpcId' --output text --region us-east-2)
+SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
+
+# Criar replication group com todas as configurações
+aws elasticache create-replication-group \
+    --replication-group-id "lab-failover-$ID" \
+    --description "Lab failover cluster for $ID" \
+    --num-cache-clusters 3 \
+    --cache-node-type cache.t3.micro \
+    --engine redis \
+    --engine-version 7.0 \
+    --port 6379 \
+    --cache-subnet-group-name elasticache-lab-subnet-group \
+    --security-group-ids $SG_ID \
+    --multi-az-enabled \
+    --automatic-failover-enabled \
+    --at-rest-encryption-enabled \
+    --transit-encryption-enabled \
+    --auto-minor-version-upgrade \
+    --tags Key=Name,Value="Lab Failover - $ID" Key=Lab,Value=Lab02 Key=Purpose,Value=Failover-Testing \
+    --region us-east-2
+
+echo "✅ Cluster criado via CLI! Aguarde ~10-15 minutos para ficar disponível."
+```
 
 #### Passo 3: Monitorar Criação
 
@@ -105,6 +151,10 @@ aws elasticache describe-replication-groups --replication-group-id lab-failover-
 
 # Aguardar até status "available" (pode levar 15-20 minutos)
 watch -n 30 "aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].Status' --output text --region us-east-2"
+
+# Verificar configurações de segurança
+echo "=== Verificando Configurações de Segurança ==="
+aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].{AtRestEncryption:AtRestEncryptionEnabled,TransitEncryption:TransitEncryptionEnabled,MultiAZ:MultiAZ,AutoFailover:AutomaticFailoverStatus}' --region us-east-2
 ```
 
 #### Passo 4: Identificar Topologia do Cluster
@@ -139,12 +189,17 @@ echo "Reader Endpoint: $READER_ENDPOINT"
 # Testar conexão com nó primário
 redis-cli -h $PRIMARY_ENDPOINT -p 6379 ping
 
+# Se houver erro de conexão devido à criptografia, tente com TLS:
+# redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls ping
+
 # Testar conexão com réplicas (via reader endpoint)
 redis-cli -h $READER_ENDPOINT -p 6379 ping
 
 # Verificar informações do cluster
 redis-cli -h $PRIMARY_ENDPOINT -p 6379 info replication
 ```
+
+> **⚠️ Nota sobre Criptografia:** Como habilitamos criptografia em trânsito, você pode precisar usar `--tls` em alguns casos. Para este lab, testamos primeiro sem TLS para simplicidade.
 
 #### Passo 2: Popular Dados de Teste
 
@@ -447,17 +502,28 @@ watch -n 30 "aws elasticache describe-replication-groups --replication-group-id 
    - Confirme que há pelo menos 1 réplica
    - Valide permissões IAM para failover
 
-2. **Conectividade perdida após failover**
+2. **Erro de conexão com redis-cli**
+   - **Criptografia em trânsito habilitada:** Use `redis-cli` com `--tls`
+   - **Exemplo:** `redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls ping`
+   - **Documentação:** [ElastiCache Encryption](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
+
+3. **Comando CLI create-replication-group falha**
+   - **Verifique IDs:** Confirme que VPC_ID e SG_ID foram obtidos corretamente
+   - **Permissões:** Verifique se tem permissões ElastiCache completas
+   - **Subnet Group:** Confirme que `elasticache-lab-subnet-group` existe
+   - **Nome único:** Replication group ID deve ser único na região
+
+4. **Conectividade perdida após failover**
    - Aguarde atualização do DNS (até 60s)
    - Verifique se aplicação usa endpoint correto
    - Teste conectividade manual com redis-cli
 
-3. **Dados perdidos após failover**
+5. **Dados perdidos após failover**
    - Verifique se replicação estava funcionando
    - Confirme que não houve split-brain
    - Analise logs de eventos do ElastiCache
 
-4. **Failover muito lento**
+6. **Failover muito lento**
    - Verifique latência de rede entre AZs
    - Confirme configuração de timeouts
    - Analise métricas de CPU e memória

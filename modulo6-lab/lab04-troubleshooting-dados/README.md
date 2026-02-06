@@ -84,6 +84,7 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
    - **Location:**
      - **AWS Cloud**
      - **Multi-AZ:** Disabled (para este lab)
+     - **Failover automático:** Desabilitado (não aplicável sem réplicas)
    - **Cluster settings:**
      - **Engine version:** 7.0
      - **Port:** 6379
@@ -93,8 +94,54 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
      - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
+   - **Security (Segurança):**
+     - **Criptografia em repouso:** Habilitada (recomendado)
+     - **Chave de criptografia:** Chave padrão (AWS managed)
+     - **Criptografia em trânsito:** Habilitada (recomendado)
+     - **Controle de acesso:** Nenhum controle de acesso (para simplicidade do lab)
+   - **Backup:**
+     - **Enable automatic backups:** Enabled
+   - **Maintenance:**
+     - **Auto minor version upgrade:** Enabled
+   - **Advanced settings:**
+     - **Tags (Recomendado):**
+       - **Key:** `Name` **Value:** `Lab Data - $ID`
+       - **Key:** `Lab` **Value:** `Lab04`
+       - **Key:** `Purpose` **Value:** `Data-Analysis`
 
-4. Clique em **Create**
+6. Clique em **Create**
+
+> **📚 Para saber mais sobre segurança:**
+> - [Criptografia no ElastiCache](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
+> - [Configurações de segurança](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/auth.html)
+
+#### Alternativa: Criação Rápida via CLI
+
+Para acelerar o processo, você pode criar o cluster via CLI:
+
+```bash
+# Obter IDs necessários
+VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=ElastiCache-Lab-VPC" --query 'Vpcs[0].VpcId' --output text --region us-east-2)
+SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
+
+# Criar cluster com todas as configurações
+aws elasticache create-cache-cluster \
+    --cache-cluster-id "lab-data-$ID" \
+    --cache-node-type cache.t3.micro \
+    --engine redis \
+    --engine-version 7.0 \
+    --port 6379 \
+    --num-cache-nodes 1 \
+    --cache-subnet-group-name elasticache-lab-subnet-group \
+    --security-group-ids $SG_ID \
+    --at-rest-encryption-enabled \
+    --transit-encryption-enabled \
+    --auto-minor-version-upgrade \
+    --tags Key=Name,Value="Lab Data - $ID" Key=Lab,Value=Lab04 Key=Purpose,Value=Data-Analysis \
+    --region us-east-2
+
+echo "✅ Cluster criado via CLI! Aguarde ~10-15 minutos para ficar disponível."
+```
 
 #### Passo 3: Aguardar Criação e Obter Endpoint
 
@@ -112,6 +159,9 @@ echo "Data Cluster Endpoint: $DATA_ENDPOINT"
 ```bash
 # Testar conectividade
 redis-cli -h $DATA_ENDPOINT -p 6379 ping
+
+# Se houver erro de conexão devido à criptografia, tente com TLS:
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls ping
 
 # Popular com diferentes tipos de dados
 echo "📊 Populando cluster com dados diversos..."
@@ -673,27 +723,32 @@ rm -f /tmp/monitor_output_$ID.txt
 
 ### Problemas Comuns
 
-1. **Big keys causando latência**
+1. **Erro de conexão com redis-cli**
+   - **Criptografia em trânsito habilitada:** Use `redis-cli` com `--tls`
+   - **Exemplo:** `redis-cli -h $DATA_ENDPOINT -p 6379 --tls ping`
+   - **Documentação:** [ElastiCache Encryption](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
+
+2. **Big keys causando latência**
    - Use paginação em vez de operações completas
    - Considere quebrar big keys em estruturas menores
    - Implemente TTL apropriado
 
-2. **Hot keys sobrecarregando cluster**
+3. **Hot keys sobrecarregando cluster**
    - Replique hot keys em múltiplas chaves
    - Use cache local na aplicação
    - Considere cluster mode enabled
 
-3. **Memória crescendo indefinidamente**
+4. **Memória crescendo indefinidamente**
    - Implemente TTL em todas as chaves
    - Configure política de eviction
    - Monitore padrões de crescimento
 
-4. **Performance degradada**
+5. **Performance degradada**
    - Evite comandos KEYS em produção
    - Use SCAN em vez de operações completas
    - Otimize estruturas de dados
 
-5. **Hit rate baixo**
+6. **Hit rate baixo**
    - Revise estratégia de TTL
    - Analise padrões de acesso
    - Ajuste tamanho do cache

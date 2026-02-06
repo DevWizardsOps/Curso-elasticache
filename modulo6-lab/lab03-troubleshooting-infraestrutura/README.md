@@ -82,6 +82,7 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
    - **Location:**
      - **AWS Cloud**
      - **Multi-AZ:** Disabled (para este lab)
+     - **Failover automático:** Desabilitado (não aplicável sem réplicas)
    - **Cluster settings:**
      - **Engine version:** 7.0
      - **Port:** 6379
@@ -91,11 +92,56 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
      - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
+   - **Security (Segurança):**
+     - **Criptografia em repouso:** Habilitada (recomendado)
+     - **Chave de criptografia:** Chave padrão (AWS managed)
+     - **Criptografia em trânsito:** Habilitada (recomendado)
+     - **Controle de acesso:** Nenhum controle de acesso (para simplicidade do lab)
+   - **Backup:**
+     - **Enable automatic backups:** Enabled
+   - **Maintenance:**
+     - **Auto minor version upgrade:** Enabled
    - **Advanced settings:**
      - **Parameter group:** default.redis7.x
      - **Log delivery:** Disabled (para este lab)
+     - **Tags (Recomendado):**
+       - **Key:** `Name` **Value:** `Lab Troubleshoot - $ID`
+       - **Key:** `Lab` **Value:** `Lab03`
+       - **Key:** `Purpose` **Value:** `Infrastructure-Testing`
 
-4. Clique em **Create**
+6. Clique em **Create**
+
+> **📚 Para saber mais sobre segurança:**
+> - [Criptografia no ElastiCache](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
+> - [Configurações de segurança](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/auth.html)
+
+#### Alternativa: Criação Rápida via CLI
+
+Para acelerar o processo, você pode criar o cluster via CLI:
+
+```bash
+# Obter IDs necessários
+VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=ElastiCache-Lab-VPC" --query 'Vpcs[0].VpcId' --output text --region us-east-2)
+SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
+
+# Criar cluster com todas as configurações
+aws elasticache create-cache-cluster \
+    --cache-cluster-id "lab-troubleshoot-$ID" \
+    --cache-node-type cache.t3.micro \
+    --engine redis \
+    --engine-version 7.0 \
+    --port 6379 \
+    --num-cache-nodes 1 \
+    --cache-subnet-group-name elasticache-lab-subnet-group \
+    --security-group-ids $SG_ID \
+    --at-rest-encryption-enabled \
+    --transit-encryption-enabled \
+    --auto-minor-version-upgrade \
+    --tags Key=Name,Value="Lab Troubleshoot - $ID" Key=Lab,Value=Lab03 Key=Purpose,Value=Infrastructure-Testing \
+    --region us-east-2
+
+echo "✅ Cluster criado via CLI! Aguarde ~10-15 minutos para ficar disponível."
+```
 
 #### Passo 3: Monitorar Criação e Obter Informações
 
@@ -125,6 +171,9 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$ID 
 # Teste básico de conectividade
 echo "🔍 Testando conectividade básica..."
 redis-cli -h $CLUSTER_ENDPOINT -p 6379 ping
+
+# Se houver erro de conexão devido à criptografia, tente com TLS:
+redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls ping
 
 # Se falhar, vamos diagnosticar passo a passo
 if [ $? -ne 0 ]; then
@@ -638,22 +687,33 @@ aws cloudwatch delete-alarms --alarm-names "ElastiCache-HighCPU-$ID" --region us
    - Verifique região selecionada
    - Confirme que cluster está ativo
 
-2. **Alta latência persistente**
+2. **Erro de conexão com redis-cli**
+   - **Criptografia em trânsito habilitada:** Use `redis-cli` com `--tls`
+   - **Exemplo:** `redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls ping`
+   - **Documentação:** [ElastiCache Encryption](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
+
+3. **Comando CLI create-cache-cluster falha**
+   - **Verifique IDs:** Confirme que VPC_ID e SG_ID foram obtidos corretamente
+   - **Permissões:** Verifique se tem permissões ElastiCache completas
+   - **Subnet Group:** Confirme que `elasticache-lab-subnet-group` existe
+   - **Nome único:** Cache cluster ID deve ser único na região
+
+4. **Alta latência persistente**
    - Verifique CPU e memória
    - Analise comandos executados
    - Considere otimização de queries
 
-3. **Uso de swap detectado**
+5. **Uso de swap detectado**
    - **CRÍTICO:** Investigar imediatamente
    - Verificar configuração de memória
    - Considerar upgrade de instância
 
-4. **Conectividade intermitente**
+6. **Conectividade intermitente**
    - Verificar Security Groups
    - Analisar logs de rede
    - Testar de diferentes origens
 
-5. **CPU alta sem carga aparente**
+7. **CPU alta sem carga aparente**
    - Verificar comandos KEYS
    - Analisar operações de background
    - Revisar configuração de persistence

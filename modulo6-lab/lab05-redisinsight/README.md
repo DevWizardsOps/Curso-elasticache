@@ -82,6 +82,7 @@ which redisinsight || echo "RedisInsight não encontrado - será instalado"
    - **Location:**
      - **AWS Cloud**
      - **Multi-AZ:** Disabled (para este lab)
+     - **Failover automático:** Desabilitado (não aplicável sem réplicas)
    - **Cluster settings:**
      - **Engine version:** 7.0
      - **Port:** 6379
@@ -91,8 +92,54 @@ which redisinsight || echo "RedisInsight não encontrado - será instalado"
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
      - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
+   - **Security (Segurança):**
+     - **Criptografia em repouso:** Habilitada (recomendado)
+     - **Chave de criptografia:** Chave padrão (AWS managed)
+     - **Criptografia em trânsito:** Habilitada (recomendado)
+     - **Controle de acesso:** Nenhum controle de acesso (para simplicidade do lab)
+   - **Backup:**
+     - **Enable automatic backups:** Enabled
+   - **Maintenance:**
+     - **Auto minor version upgrade:** Enabled
+   - **Advanced settings:**
+     - **Tags (Recomendado):**
+       - **Key:** `Name` **Value:** `Lab RedisInsight - $ID`
+       - **Key:** `Lab` **Value:** `Lab05`
+       - **Key:** `Purpose` **Value:** `Visual-Monitoring`
 
-4. Clique em **Create**
+6. Clique em **Create**
+
+> **📚 Para saber mais sobre segurança:**
+> - [Criptografia no ElastiCache](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
+> - [Configurações de segurança](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/auth.html)
+
+#### Alternativa: Criação Rápida via CLI
+
+Para acelerar o processo, você pode criar o cluster via CLI:
+
+```bash
+# Obter IDs necessários
+VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=ElastiCache-Lab-VPC" --query 'Vpcs[0].VpcId' --output text --region us-east-2)
+SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
+
+# Criar cluster com todas as configurações
+aws elasticache create-cache-cluster \
+    --cache-cluster-id "lab-insight-$ID" \
+    --cache-node-type cache.t3.micro \
+    --engine redis \
+    --engine-version 7.0 \
+    --port 6379 \
+    --num-cache-nodes 1 \
+    --cache-subnet-group-name elasticache-lab-subnet-group \
+    --security-group-ids $SG_ID \
+    --at-rest-encryption-enabled \
+    --transit-encryption-enabled \
+    --auto-minor-version-upgrade \
+    --tags Key=Name,Value="Lab RedisInsight - $ID" Key=Lab,Value=Lab05 Key=Purpose,Value=Visual-Monitoring \
+    --region us-east-2
+
+echo "✅ Cluster criado via CLI! Aguarde ~10-15 minutos para ficar disponível."
+```
 
 #### Passo 3: Aguardar Criação e Obter Endpoint
 
@@ -110,6 +157,9 @@ echo "RedisInsight Cluster Endpoint: $INSIGHT_ENDPOINT"
 ```bash
 # Testar conectividade
 redis-cli -h $INSIGHT_ENDPOINT -p 6379 ping
+
+# Se houver erro de conexão devido à criptografia, tente com TLS:
+redis-cli -h $INSIGHT_ENDPOINT -p 6379 --tls ping
 
 # Popular com dados diversos para exploração visual
 echo "📊 Populando cluster com dados interessantes para RedisInsight..."
@@ -542,23 +592,29 @@ rm -f /tmp/redisinsight_$ID.log
    - Verifique se túnel SSH está ativo
    - Confirme porta local (6380)
    - Teste conectividade: `redis-cli -h localhost -p 6380 ping`
+   - **Criptografia:** Se usando TLS, teste: `redis-cli -h localhost -p 6380 --tls ping`
 
-2. **Túnel SSH falha**
+2. **Erro de conexão com criptografia**
+   - **RedisInsight com TLS:** Configure SSL/TLS nas configurações de conexão
+   - **Túnel SSH:** O túnel pode não suportar TLS - use conexão direta se necessário
+   - **Documentação:** [ElastiCache Encryption](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
+
+3. **Túnel SSH falha**
    - Verifique chaves SSH
    - Confirme Security Groups
    - Teste conectividade com Bastion Host
 
-3. **Interface lenta**
+4. **Interface lenta**
    - Reduza número de chaves exibidas
    - Use filtros no Browser
    - Limite análises a padrões específicos
 
-4. **Profiler não mostra dados**
+5. **Profiler não mostra dados**
    - Verifique se está conectado
    - Gere atividade no Redis
    - Reinicie o Profiler
 
-5. **Erro de permissão**
+6. **Erro de permissão**
    - Verifique usuário do túnel SSH
    - Confirme permissões de rede
    - Teste acesso direto ao ElastiCache
