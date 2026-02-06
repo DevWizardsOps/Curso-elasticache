@@ -124,22 +124,41 @@ Para acelerar o processo, você pode criar o cluster via CLI:
 VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=ElastiCache-Lab-VPC" --query 'Vpcs[0].VpcId' --output text --region us-east-2)
 SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
 
-# Criar cluster com todas as configurações
-aws elasticache create-cache-cluster \
-    --cache-cluster-id "lab-troubleshoot-$ID" \
+# IMPORTANTE: Para ter criptografia via CLI, devemos usar Replication Group (mesmo com 1 nó)
+# create-cache-cluster NÃO suporta parâmetros de criptografia
+aws elasticache create-replication-group \
+    --replication-group-id "lab-troubleshoot-$ID" \
+    --replication-group-description "Troubleshooting with encryption" \
+    --num-cache-clusters 1 \
     --cache-node-type cache.t3.micro \
     --engine redis \
     --engine-version 7.0 \
     --port 6379 \
-    --num-cache-nodes 1 \
     --cache-subnet-group-name elasticache-lab-subnet-group \
     --security-group-ids $SG_ID \
+    --at-rest-encryption-enabled \
+    --transit-encryption-enabled \
     --auto-minor-version-upgrade \
     --tags Key=Name,Value="Lab Troubleshoot - $ID" Key=Lab,Value=Lab03 Key=Purpose,Value=Infrastructure-Testing \
     --region us-east-2
 
-echo "✅ Cluster criado via CLI! Aguarde ~10-15 minutos para ficar disponível."
-echo "⚠️  Nota: Para criptografia em clusters simples, configure via Parameter Groups ou use Replication Groups."
+echo "✅ Replication Group criado via CLI! Aguarde ~10-15 minutos para ficar disponível."
+```
+
+> **🏗️ PONTO ARQUITETURAL IMPORTANTE:**
+> 
+> **Por que usar `create-replication-group` em vez de `create-cache-cluster`?**
+> 
+> - **`create-cache-cluster`:** Comando legado, NÃO suporta criptografia
+> - **`create-replication-group`:** Comando moderno, suporta todas as funcionalidades
+> 
+> **Mesmo para 1 nó único**, use `create-replication-group` se precisar de:
+> - ✅ Criptografia (at-rest e in-transit)
+> - ✅ Backups automáticos
+> - ✅ Multi-AZ (futuro)
+> - ✅ Failover automático (futuro)
+> 
+> **Regra prática:** Sempre use `create-replication-group` em produção!
 ```
 
 #### Passo 3: Monitorar Criação e Obter Informações
@@ -691,11 +710,11 @@ aws cloudwatch delete-alarms --alarm-names "ElastiCache-HighCPU-$ID" --region us
    - **Exemplo:** `redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls ping`
    - **Documentação:** [ElastiCache Encryption](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
 
-3. **Comando CLI create-cache-cluster falha**
+3. **Comando CLI create-replication-group falha**
    - **Verifique IDs:** Confirme que VPC_ID e SG_ID foram obtidos corretamente
    - **Permissões:** Verifique se tem permissões ElastiCache completas
    - **Subnet Group:** Confirme que `elasticache-lab-subnet-group` existe
-   - **Nome único:** Cache cluster ID deve ser único na região
+   - **Nome único:** Replication group ID deve ser único na região
 
 4. **Alta latência persistente**
    - Verifique CPU e memória
