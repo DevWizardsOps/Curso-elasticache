@@ -363,12 +363,23 @@ echo "HGETALL big_hash: ${HGETALL_TIME}ms ($(( HGETALL_TIME / GET_TIME ))x mais 
 #### Passo 1: Configurar Monitoramento de Hot Keys
 
 ```bash
-# Verificar se hot key tracking está habilitado
+# Verificar configurações disponíveis (ElastiCache pode restringir CONFIG)
 echo "🔍 Verificando configuração de hot key tracking..."
-redis-cli -h $DATA_ENDPOINT -p 6379 --tls config get "*hotkeys*"
 
-# Habilitar tracking de hot keys (se não estiver habilitado)
-redis-cli -h $DATA_ENDPOINT -p 6379 --tls config set latency-tracking yes
+# No ElastiCache, hot key tracking geralmente não está disponível via CONFIG
+# Vamos usar abordagens alternativas para detectar hot keys
+
+echo "⚠️  NOTA: ElastiCache pode restringir comandos CONFIG por segurança"
+echo "Vamos usar métodos alternativos para detectar hot keys:"
+
+# Verificar se conseguimos acessar informações básicas
+$REDIS_CMD INFO server | head -5
+
+# Alternativa: usar MONITOR para detectar hot keys (método manual)
+echo "💡 Para detectar hot keys no ElastiCache, usaremos:"
+echo "1. Comando MONITOR (observação manual)"
+echo "2. Análise de padrões de acesso"
+echo "3. Simulação controlada"
 ```
 
 #### Passo 2: Simular Acesso a Hot Keys
