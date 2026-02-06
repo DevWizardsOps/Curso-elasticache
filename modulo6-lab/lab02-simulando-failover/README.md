@@ -154,7 +154,7 @@ watch -n 30 "aws elasticache describe-replication-groups --replication-group-id 
 
 # Verificar configurações de segurança
 echo "=== Verificando Configurações de Segurança ==="
-aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].{AtRestEncryption:AtRestEncryptionEnabled,TransitEncryption:TransitEncryptionEnabled,MultiAZ:MultiAZ,AutoFailover:AutomaticFailoverStatus}' --region us-east-2
+aws elasticache describe-replication-groups --replication-group-id lab-failover-$ID --query 'ReplicationGroups[0].{AtRestEncryption:AtRestEncryptionEnabled,TransitEncryption:TransitEncryptionEnabled,MultiAZ:MultiAZ,AutoFailover:AutomaticFailover}' --region us-east-2
 ```
 
 #### Passo 4: Identificar Topologia do Cluster
@@ -187,16 +187,13 @@ echo "Reader Endpoint: $READER_ENDPOINT"
 
 ```bash
 # Testar conexão com nó primário
-redis-cli -h $PRIMARY_ENDPOINT -p 6379 ping
-
-# Se houver erro de conexão devido à criptografia, tente com TLS:
-# redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls ping
+redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls ping
 
 # Testar conexão com réplicas (via reader endpoint)
-redis-cli -h $READER_ENDPOINT -p 6379 ping
+redis-cli -h $READER_ENDPOINT -p 6379 --tls ping
 
 # Verificar informações do cluster
-redis-cli -h $PRIMARY_ENDPOINT -p 6379 info replication
+redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls info replication
 ```
 
 > **⚠️ Nota sobre Criptografia:** Como habilitamos criptografia em trânsito, você pode precisar usar `--tls` em alguns casos. Para este lab, testamos primeiro sem TLS para simplicidade.
@@ -205,7 +202,7 @@ redis-cli -h $PRIMARY_ENDPOINT -p 6379 info replication
 
 ```bash
 # Inserir dados de teste no primário
-redis-cli -h $PRIMARY_ENDPOINT -p 6379 << EOF
+redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls << EOF
 SET "user:$ID:1" "João Silva"
 SET "user:$ID:2" "Maria Santos"
 SET "user:$ID:3" "Pedro Costa"
@@ -217,7 +214,7 @@ INCR "counter:$ID:visits"
 EOF
 
 # Verificar dados inseridos
-redis-cli -h $PRIMARY_ENDPOINT -p 6379 << EOF
+redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls << EOF
 GET "user:$ID:1"
 HGETALL "session:$ID:abc123"
 LRANGE "events:$ID" 0 -1
@@ -229,13 +226,13 @@ EOF
 
 ```bash
 # Ler dados das réplicas (deve ser idêntico)
-redis-cli -h $READER_ENDPOINT -p 6379 << EOF
+redis-cli -h $READER_ENDPOINT -p 6379 --tls << EOF
 GET "user:$ID:1"
 GET "counter:$ID:visits"
 EOF
 
 # Tentar escrever na réplica (deve falhar)
-redis-cli -h $READER_ENDPOINT -p 6379 SET "test:write" "should fail" || echo "✅ Réplica corretamente configurada como read-only"
+redis-cli -h $READER_ENDPOINT -p 6379 --tls SET "test:write" "should fail" || echo "✅ Réplica corretamente configurada como read-only"
 ```
 
 **✅ Checkpoint:** Dados devem estar replicados e réplicas devem ser read-only.
@@ -286,10 +283,10 @@ for i in {1..20}; do
     echo "Nó Primário: $NEW_PRIMARY"
     
     # Testar conectividade
-    if redis-cli -h $PRIMARY_ENDPOINT -p 6379 ping > /dev/null 2>&1; then
+    if redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls ping > /dev/null 2>&1; then
         echo "✅ Conectividade: OK"
         # Testar leitura de dados
-        COUNTER_VALUE=$(redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "counter:$ID:visits" 2>/dev/null)
+        COUNTER_VALUE=$(redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls GET "counter:$ID:visits" 2>/dev/null)
         echo "Contador de visitas: $COUNTER_VALUE"
     else
         echo "❌ Conectividade: FALHOU"
@@ -310,7 +307,7 @@ echo "Novo Primário: $NEW_PRIMARY_FINAL"
 
 # Verificar integridade dos dados
 echo "=== Verificação de Integridade dos Dados ==="
-redis-cli -h $PRIMARY_ENDPOINT -p 6379 << EOF
+redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls << EOF
 GET "user:$ID:1"
 HGETALL "session:$ID:abc123"
 LRANGE "events:$ID" 0 -1
@@ -318,8 +315,8 @@ GET "counter:$ID:visits"
 EOF
 
 # Testar nova escrita
-redis-cli -h $PRIMARY_ENDPOINT -p 6379 SET "failover:test:$ID" "Failover completed at $(date)"
-redis-cli -h $PRIMARY_ENDPOINT -p 6379 GET "failover:test:$ID"
+redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls SET "failover:test:$ID" "Failover completed at $(date)"
+redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls GET "failover:test:$ID"
 ```
 
 **✅ Checkpoint:** Failover deve ter sido concluído com novo primário e dados íntegros.
@@ -396,7 +393,7 @@ echo "Testando resiliência durante failover..."
 # Função para testar conectividade
 test_connection() {
     local timestamp=$(date '+%H:%M:%S')
-    if redis-cli -h $PRIMARY_ENDPOINT -p 6379 ping > /dev/null 2>&1; then
+    if redis-cli -h $PRIMARY_ENDPOINT -p 6379 --tls ping > /dev/null 2>&1; then
         echo "[$timestamp] ✅ Conexão OK"
         return 0
     else
