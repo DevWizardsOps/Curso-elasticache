@@ -303,11 +303,19 @@ aws ec2 describe-security-groups --group-ids $SG_ID --query 'SecurityGroups[0].I
 #### Passo 2: Monitorar Criação via CLI
 
 ```bash
-# Monitorar status do cluster
+# Monitorar status do cluster (tente primeiro como cache cluster)
 aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --show-cache-node-info --region us-east-2
 
+# Se receber erro "CacheClusterNotFound", o cluster foi criado como replication group
+# Tente este comando alternativo:
+aws elasticache describe-replication-groups --replication-group-id lab-cluster-disabled-$ID --region us-east-2
+
 # Aguardar até status "available" (pode levar 10-15 minutos)
-watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --query 'CacheClusters[0].CacheClusterStatus' --output text --region us-east-2"
+# Para cache cluster:
+watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --query 'CacheClusters[0].CacheClusterStatus' --output text --region us-east-2 2>/dev/null || echo 'Tentando como replication group...'"
+
+# Para replication group (se o comando acima falhar):
+watch -n 30 "aws elasticache describe-replication-groups --replication-group-id lab-cluster-disabled-$ID --query 'ReplicationGroups[0].Status' --output text --region us-east-2"
 ```
 
 #### Passo 3: Analisar Endpoints
@@ -315,11 +323,29 @@ watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-clus
 Quando o cluster estiver disponível:
 
 ```bash
-# Obter endpoint do cluster
-ENDPOINT_DISABLED=$(aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --show-cache-node-info --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text --region us-east-2)
+# Script completo para obter endpoint (funciona para ambos os casos)
+get_cluster_endpoint() {
+    local cluster_id=$1
+    local endpoint=""
+    
+    # Tenta primeiro como cache cluster
+    endpoint=$(aws elasticache describe-cache-clusters --cache-cluster-id $cluster_id --show-cache-node-info --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text --region us-east-2 2>/dev/null)
+    
+    # Se não funcionar, tenta como replication group
+    if [ -z "$endpoint" ] || [ "$endpoint" = "None" ]; then
+        endpoint=$(aws elasticache describe-replication-groups --replication-group-id $cluster_id --query 'ReplicationGroups[0].NodeGroups[0].PrimaryEndpoint.Address' --output text --region us-east-2 2>/dev/null)
+    fi
+    
+    echo $endpoint
+}
+
+# Usar a função
+ENDPOINT_DISABLED=$(get_cluster_endpoint "lab-cluster-disabled-$ID")
 echo "Endpoint Disabled: $ENDPOINT_DISABLED"
 
-# Informações detalhadas
+# Verificar informações detalhadas
+echo "=== Informações do Cluster ==="
+aws elasticache describe-replication-groups --replication-group-id lab-cluster-disabled-$ID --region us-east-2 2>/dev/null || \
 aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --show-cache-node-info --region us-east-2
 ```
 
@@ -332,6 +358,8 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-
 > **💡 Explicação das Configurações:**
 > - **Multi-AZ Desabilitado:** Cluster fica em uma única zona de disponibilidade (mais simples para este lab)
 > - **Failover automático Desabilitado:** Sem failover automático (adequado para exercício básico)
+
+> **⚠️ Nota Importante:** Dependendo da configuração, a AWS pode criar o cluster como um **Replication Group** mesmo no modo "Disabled". Isso é normal e não afeta a funcionalidade. Use os comandos alternativos fornecidos se receber erro "CacheClusterNotFound".
 
 **✅ Checkpoint:** Cluster deve estar no status "available" com endpoint acessível.
 
@@ -392,7 +420,7 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-
 > **📚 Para saber mais sobre segurança:**
 > - [Criptografia no ElastiCache](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
 > - [Controle de acesso Redis AUTH](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/auth.html)
-> - [Boas práticas de segurança](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/security.html)
+> - [Boas práticas de segurança](https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/redis-security.html)
 
 4. Clique em **Create**
 
@@ -532,7 +560,11 @@ redis-cli -h $ENDPOINT_ENABLED -p 6379 -c get "test-cluster-$ID"
 
 ```bash
 # Informações detalhadas do cluster disabled
-aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --show-cache-node-info --region us-east-2
+# Tente primeiro como cache cluster:
+aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --show-cache-node-info --region us-east-2 2>/dev/null
+
+# Se não funcionar, tente como replication group:
+aws elasticache describe-replication-groups --replication-group-id lab-cluster-disabled-$ID --region us-east-2
 
 # Informações detalhadas do cluster enabled
 aws elasticache describe-replication-groups --replication-group-id lab-cluster-enabled-$ID --region us-east-2
@@ -561,13 +593,21 @@ aws elasticache describe-replication-groups --replication-group-id lab-cluster-e
 
 ### Via CLI:
 ```bash
-# Deletar clusters
+# Deletar clusters (tente ambos os métodos)
+# Para cluster disabled:
+aws elasticache delete-replication-group --replication-group-id lab-cluster-disabled-$ID --region us-east-2 2>/dev/null || \
 aws elasticache delete-cache-cluster --cache-cluster-id lab-cluster-disabled-$ID --region us-east-2
+
+# Para cluster enabled:
 aws elasticache delete-replication-group --replication-group-id lab-cluster-enabled-$ID --region us-east-2
 
 # Aguardar deleção dos clusters antes de deletar Security Group
-aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --region us-east-2
-# Quando retornar erro "CacheClusterNotFound", pode deletar o SG
+echo "Aguardando deleção dos clusters..."
+while aws elasticache describe-replication-groups --replication-group-id lab-cluster-disabled-$ID --region us-east-2 >/dev/null 2>&1 || \
+      aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --region us-east-2 >/dev/null 2>&1; do
+    echo "Aguardando deleção do cluster disabled..."
+    sleep 30
+done
 
 # Deletar Security Group
 aws ec2 delete-security-group --group-id $SG_ID --region us-east-2
@@ -629,7 +669,19 @@ aws ec2 delete-security-group --group-id $SG_ID --region us-east-2
    - Confirme que tem permissões ElastiCache
    - Verifique se está usando o usuário IAM correto
 
-7. **Problemas com criptografia**
+7. **Erro "CacheClusterNotFound" mas cluster existe no Console**
+   - **CAUSA:** Cluster foi criado como Replication Group em vez de Cache Cluster
+   - **SOLUÇÃO:** Use comandos alternativos:
+     ```bash
+     # Em vez de describe-cache-clusters, use:
+     aws elasticache describe-replication-groups --replication-group-id lab-cluster-disabled-$ID --region us-east-2
+     
+     # Para obter endpoint:
+     aws elasticache describe-replication-groups --replication-group-id lab-cluster-disabled-$ID --query 'ReplicationGroups[0].NodeGroups[0].PrimaryEndpoint.Address' --output text --region us-east-2
+     ```
+   - **NORMAL:** Isso não afeta a funcionalidade do cluster
+
+8. **Problemas com criptografia**
    - **Criptografia em trânsito habilitada:** Use `redis-cli` com `--tls`
    - **Erro de conexão:** Verifique se cliente suporta TLS
    - **Documentação:** [ElastiCache Encryption](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
