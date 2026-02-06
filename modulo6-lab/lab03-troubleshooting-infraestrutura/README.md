@@ -159,7 +159,7 @@ echo "✅ Replication Group criado via CLI! Aguarde ~10-15 minutos para ficar di
 > - ✅ Failover automático (futuro)
 > 
 > **Regra prática:** Sempre use `create-replication-group` em produção!
-```
+
 
 #### Passo 3: Monitorar Criação e Obter Informações
 
@@ -188,9 +188,6 @@ aws elasticache describe-replication-groups --replication-group-id lab-troublesh
 ```bash
 # Teste básico de conectividade
 echo "🔍 Testando conectividade básica..."
-redis-cli -h $CLUSTER_ENDPOINT -p 6379 ping
-
-# Se houver erro de conexão devido à criptografia, tente com TLS:
 redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls ping
 
 # Se falhar, vamos diagnosticar passo a passo
@@ -254,7 +251,7 @@ echo "⚠️  Removendo regra temporariamente..."
 
 # Testar conectividade (deve falhar)
 echo "🔍 Testando conectividade após remoção da regra..."
-timeout 10 redis-cli -h $CLUSTER_ENDPOINT -p 6379 ping || echo "❌ Conectividade falhou como esperado"
+timeout 10 redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls ping || echo "❌ Conectividade falhou como esperado"
 
 # Restaurar regra
 echo "🔧 Restaurando regra de Security Group..."
@@ -277,7 +274,7 @@ echo "✅ Regra restaurada - conectividade deve voltar ao normal"
 # Popular dados iniciais para estabelecer baseline
 echo "📊 Estabelecendo baseline de performance..."
 
-redis-cli -h $CLUSTER_ENDPOINT -p 6379 << EOF
+redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls << EOF
 # Limpar dados existentes
 FLUSHALL
 
@@ -377,14 +374,14 @@ for i in {1..6}; do
     
     # Testar latência
     START_TIME=$(date +%s%N)
-    redis-cli -h $CLUSTER_ENDPOINT -p 6379 ping > /dev/null
+    redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls ping > /dev/null
     END_TIME=$(date +%s%N)
     LATENCY=$(( (END_TIME - START_TIME) / 1000000 ))
     echo "Latência PING: ${LATENCY}ms"
     
     # Testar operação simples
     START_TIME=$(date +%s%N)
-    redis-cli -h $CLUSTER_ENDPOINT -p 6379 GET baseline:$ID:key1 > /dev/null
+    redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls GET baseline:$ID:key1 > /dev/null
     END_TIME=$(date +%s%N)
     LATENCY=$(( (END_TIME - START_TIME) / 1000000 ))
     echo "Latência GET: ${LATENCY}ms"
@@ -438,10 +435,10 @@ aws cloudwatch get-metric-statistics \
 # Obter informações de memória do Redis
 echo "🔍 Analisando uso de memória..."
 
-redis-cli -h $CLUSTER_ENDPOINT -p 6379 info memory
+redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls info memory
 
 # Métricas específicas de interesse
-redis-cli -h $CLUSTER_ENDPOINT -p 6379 << EOF
+redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls << EOF
 INFO memory | grep -E "(used_memory|used_memory_human|used_memory_peak|maxmemory)"
 EOF
 ```
@@ -497,7 +494,7 @@ consume_memory() {
     for i in $(seq 1 $num_keys); do
         # Criar string de 1KB
         local value=$(printf 'A%.0s' {1..1024})
-        redis-cli -h $CLUSTER_ENDPOINT -p 6379 SET "memory_test:$ID:$i" "$value" > /dev/null
+        redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls SET "memory_test:$ID:$i" "$value" > /dev/null
         
         # Mostrar progresso a cada 1000 chaves
         if [ $((i % 1000)) -eq 0 ]; then
@@ -515,15 +512,15 @@ for i in {1..5}; do
     echo "=== Verificação $i ($(date)) ==="
     
     # Informações de memória do Redis
-    USED_MEMORY=$(redis-cli -h $CLUSTER_ENDPOINT -p 6379 info memory | grep "used_memory_human" | cut -d: -f2 | tr -d '\r')
-    USED_MEMORY_PEAK=$(redis-cli -h $CLUSTER_ENDPOINT -p 6379 info memory | grep "used_memory_peak_human" | cut -d: -f2 | tr -d '\r')
+    USED_MEMORY=$(redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls info memory | grep "used_memory_human" | cut -d: -f2 | tr -d '\r')
+    USED_MEMORY_PEAK=$(redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls info memory | grep "used_memory_peak_human" | cut -d: -f2 | tr -d '\r')
     
     echo "Memória Usada: $USED_MEMORY"
     echo "Pico de Memória: $USED_MEMORY_PEAK"
     
     # Testar performance com alta utilização de memória
     START_TIME=$(date +%s%N)
-    redis-cli -h $CLUSTER_ENDPOINT -p 6379 GET baseline:$ID:key1 > /dev/null
+    redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls GET baseline:$ID:key1 > /dev/null
     END_TIME=$(date +%s%N)
     LATENCY=$(( (END_TIME - START_TIME) / 1000000 ))
     echo "Latência GET: ${LATENCY}ms"
@@ -533,7 +530,7 @@ done
 
 # Limpar dados de teste de memória
 echo "🧹 Limpando dados de teste..."
-redis-cli -h $CLUSTER_ENDPOINT -p 6379 eval "
+redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls eval "
     local keys = redis.call('keys', 'memory_test:$ID:*')
     for i=1,#keys do
         redis.call('del', keys[i])
@@ -551,13 +548,13 @@ echo "✅ Simulação de pressão de memória concluída"
 echo "🔍 Analisando padrões de uso de memória..."
 
 # Verificar fragmentação de memória
-redis-cli -h $CLUSTER_ENDPOINT -p 6379 info memory | grep -E "(mem_fragmentation|mem_allocator)"
+redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls info memory | grep -E "(mem_fragmentation|mem_allocator)"
 
 # Verificar estatísticas de eviction (se configurado)
-redis-cli -h $CLUSTER_ENDPOINT -p 6379 info stats | grep -E "(evicted_keys|expired_keys)"
+redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls info stats | grep -E "(evicted_keys|expired_keys)"
 
 # Verificar configuração de maxmemory
-redis-cli -h $CLUSTER_ENDPOINT -p 6379 config get maxmemory*
+redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls config get maxmemory*
 ```
 
 **Sinais de Problema de Memória:**
