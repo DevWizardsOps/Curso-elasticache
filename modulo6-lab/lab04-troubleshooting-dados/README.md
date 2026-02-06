@@ -174,10 +174,7 @@ echo "Data Cluster Endpoint: $DATA_ENDPOINT"
 #### Passo 4: Popular com Dados Diversos
 
 ```bash
-# Testar conectividade
-redis-cli -h $DATA_ENDPOINT -p 6379 ping
-
-# Testar conectividade primeiro (com ou sem TLS)
+# Testar conectividade primeiro
 if redis-cli -h $DATA_ENDPOINT -p 6379 --tls ping > /dev/null 2>&1; then
     echo "✅ Conectividade OK (com TLS)"
     REDIS_CMD="redis-cli -h $DATA_ENDPOINT -p 6379 --tls"
