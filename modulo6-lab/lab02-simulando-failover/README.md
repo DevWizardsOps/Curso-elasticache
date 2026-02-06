@@ -69,9 +69,10 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
 
 #### Passo 2: Criar Replication Group via Console Web
 
-1. Acesse **ElastiCache** > **Redis clusters**
-2. Clique em **Create Redis cluster**
-3. Configure:
+1. Acesse **ElastiCache** no Console AWS
+2. Na página inicial, selecione **"Caches do Redis OSS"** ← **IMPORTANTE**
+3. Clique em **Create Redis cluster**
+4. Configure:
    - **Cluster mode:** Disabled (para simplicidade do failover)
    - **Cluster info:**
      - **Name:** `lab-failover-$ID`
@@ -203,9 +204,10 @@ echo "AZ do Primário: $CURRENT_PRIMARY_AZ"
 
 #### Passo 2: Iniciar Failover via Console Web
 
-1. Acesse **ElastiCache** > **Redis clusters**
-2. Selecione seu cluster `lab-failover-$ID`
-3. Clique em **Actions** > **Failover primary**
+1. Acesse **ElastiCache** no Console AWS
+2. Vá para **"Caches do Redis OSS"**
+3. Selecione seu cluster `lab-failover-$ID`
+4. Clique em **Actions** > **Failover primary**
 4. Na janela de confirmação:
    - Verifique o nó primário atual
    - Selecione uma réplica para promover
@@ -413,7 +415,7 @@ if __name__ == "__main__":
 **CRÍTICO:** Ao final do laboratório, delete seus recursos para evitar custos:
 
 ### Via Console Web:
-1. **ElastiCache** > **Redis clusters**
+1. **ElastiCache** > **"Caches do Redis OSS"**
    - Selecione `lab-failover-$ID`
    - **Actions** > **Delete**
    - Confirme a deleção

@@ -70,9 +70,10 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
 
 #### Passo 2: Criar Cluster de Teste via Console Web
 
-1. Acesse **ElastiCache** > **Redis clusters**
-2. Clique em **Create Redis cluster**
-3. Configure:
+1. Acesse **ElastiCache** no Console AWS
+2. Na página inicial, selecione **"Caches do Redis OSS"** ← **IMPORTANTE**
+3. Clique em **Create Redis cluster**
+4. Configure:
    - **Cluster mode:** Disabled (para simplicidade)
    - **Cluster info:**
      - **Name:** `lab-troubleshoot-$ID`
@@ -601,7 +602,7 @@ aws cloudwatch put-metric-alarm \
 **CRÍTICO:** Ao final do laboratório, delete seus recursos para evitar custos:
 
 ### Via Console Web:
-1. **ElastiCache** > **Redis clusters**
+1. **ElastiCache** > **"Caches do Redis OSS"**
    - Selecione `lab-troubleshoot-$ID`
    - **Actions** > **Delete**
    - Confirme a deleção

@@ -70,9 +70,10 @@ which redisinsight || echo "RedisInsight não encontrado - será instalado"
 
 #### Passo 2: Criar Cluster para RedisInsight via Console Web
 
-1. Acesse **ElastiCache** > **Redis clusters**
-2. Clique em **Create Redis cluster**
-3. Configure:
+1. Acesse **ElastiCache** no Console AWS
+2. Na página inicial, selecione **"Caches do Redis OSS"** ← **IMPORTANTE**
+3. Clique em **Create Redis cluster**
+4. Configure:
    - **Cluster mode:** Disabled (melhor para RedisInsight)
    - **Cluster info:**
      - **Name:** `lab-insight-$ID`
@@ -503,7 +504,7 @@ aws cloudwatch get-metric-statistics \
 **CRÍTICO:** Ao final do laboratório, delete seus recursos para evitar custos:
 
 ### Via Console Web:
-1. **ElastiCache** > **Redis clusters**
+1. **ElastiCache** > **"Caches do Redis OSS"**
    - Selecione `lab-insight-$ID`
    - **Actions** > **Delete**
    - Confirme a deleção

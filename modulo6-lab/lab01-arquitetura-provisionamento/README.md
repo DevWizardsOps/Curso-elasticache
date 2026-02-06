@@ -43,6 +43,28 @@ lab01-arquitetura-provisionamento/
 - Familiaridade com conceitos de ElastiCache
 - **ID do Aluno:** Você receberá um ID único (ex: aluno01, aluno02, etc.)
 
+## ⚠️ Importante: Escolha do Engine Redis
+
+No Console AWS ElastiCache, você verá três opções de cache:
+
+### 🔴 **Redis OSS** ← **USE ESTA OPÇÃO**
+- **Redis Open Source Software**
+- Versão tradicional e amplamente compatível do Redis
+- **RECOMENDADO para este curso**
+- Suporte completo a todos os recursos Redis
+- Compatível com clientes Redis padrão
+
+### 🟡 **Valkey** 
+- Fork open-source do Redis (criado pela Linux Foundation)
+- Alternativa ao Redis após mudanças de licenciamento
+- **NÃO usar neste curso** (pode ter diferenças de comportamento)
+
+### 🔵 **Memcached**
+- Sistema de cache diferente (não é Redis)
+- **NÃO usar neste curso** (protocolo e funcionalidades diferentes)
+
+**📋 REGRA IMPORTANTE:** Sempre selecione **"Caches do Redis OSS"** em todos os exercícios deste curso.
+
 ## 🏷️ Convenção de Nomenclatura
 
 Todos os recursos criados devem seguir o padrão:
@@ -134,13 +156,20 @@ echo "Security Group ID: $SG_ID"
 
 ### Exercício 3: Cluster Mode Disabled Individual (12 minutos)
 
+> **🔴 ATENÇÃO:** Sempre selecione **"Caches do Redis OSS"** no Console AWS!
+
 **Objetivo:** Criar e analisar um cluster no modo tradicional com seu ID único
 
 #### Passo 1: Criar Cluster via Console Web
 
-1. Acesse **ElastiCache** > **Redis clusters**
-2. Clique em **Create Redis cluster**
-3. Configure:
+1. Acesse **ElastiCache** no Console AWS
+2. Na página inicial, você verá três opções:
+   - **Caches do Valkey** 
+   - **Caches do Memcached**
+   - **Caches do Redis OSS** ← **SELECIONE ESTA OPÇÃO**
+3. Clique em **Caches do Redis OSS**
+4. Clique em **Create Redis cluster**
+5. Configure:
    - **Cluster mode:** Disabled
    - **Cluster info:**
      - **Name:** `lab-cluster-disabled-$ID`
@@ -195,13 +224,20 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-
 
 ### Exercício 4: Cluster Mode Enabled Individual (12 minutos)
 
+> **🔴 ATENÇÃO:** Sempre selecione **"Caches do Redis OSS"** no Console AWS!
+
 **Objetivo:** Criar e comparar um cluster no modo distribuído com seu ID único
 
 #### Passo 1: Criar Replication Group via Console Web
 
-1. Acesse **ElastiCache** > **Redis clusters**
-2. Clique em **Create Redis cluster**
-3. Configure:
+1. Acesse **ElastiCache** no Console AWS
+2. Na página inicial, você verá três opções:
+   - **Caches do Valkey** 
+   - **Caches do Memcached**
+   - **Caches do Redis OSS** ← **SELECIONE ESTA OPÇÃO**
+3. Clique em **Caches do Redis OSS**
+4. Clique em **Create Redis cluster**
+5. Configure:
    - **Cluster mode:** Enabled
    - **Cluster info:**
      - **Name:** `lab-cluster-enabled-$ID`
@@ -323,7 +359,7 @@ aws elasticache describe-replication-groups --replication-group-id lab-cluster-e
 **CRÍTICO:** Ao final do laboratório, delete seus recursos para evitar custos:
 
 ### Via Console Web:
-1. **ElastiCache** > **Redis clusters**
+1. **ElastiCache** > **"Caches do Redis OSS"**
    - Delete `lab-cluster-disabled-$ID`
    - Delete `lab-cluster-enabled-$ID`
 2. **EC2** > **Security Groups**
@@ -357,22 +393,27 @@ aws ec2 delete-security-group --group-id $SG_ID --region us-east-2
    - Verifique se está em us-east-2
    - Configure AWS CLI: `aws configure set region us-east-2`
 
-2. **Cluster não provisiona**
+2. **Engine Incorreto**
+   - ⚠️ **SEMPRE use "Caches do Redis OSS"**
+   - NÃO use Valkey ou Memcached
+   - Se criou com engine errado, delete e recrie
+
+3. **Cluster não provisiona**
    - Verifique se subnet group existe
    - Confirme que Security Group está na VPC correta
    - Valide quotas da conta AWS
 
-3. **Erro de conectividade**
+4. **Erro de conectividade**
    - Verifique regras do security group
    - Confirme que está conectado via Bastion Host
    - Teste conectividade de rede
 
-4. **Timeout na criação**
+5. **Timeout na criação**
    - Clusters podem levar 10-15 minutos para ficarem disponíveis
    - Use `watch` para monitorar status
    - Verifique se não há conflitos de nome
 
-5. **Erro de permissão**
+6. **Erro de permissão**
    - Confirme que tem permissões ElastiCache
    - Verifique se está usando o usuário IAM correto
 
