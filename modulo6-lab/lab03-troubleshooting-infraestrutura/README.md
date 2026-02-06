@@ -208,10 +208,6 @@ nslookup $CLUSTER_ENDPOINT
 # Teste de conectividade de rede (sem Redis)
 echo "🔍 Testando conectividade de rede..."
 nc -zv $CLUSTER_ENDPOINT 6379
-
-# Teste de latência de rede
-echo "🔍 Testando latência de rede..."
-ping -c 4 $CLUSTER_ENDPOINT
 ```
 
 #### Passo 3: Análise de Security Groups
@@ -236,30 +232,6 @@ aws ec2 describe-security-groups --group-ids $SG_ID --query 'SecurityGroups[0].I
 aws ec2 describe-security-groups --group-ids $SG_ID --query 'SecurityGroups[0].IpPermissions[?FromPort==`6379`]' --region us-east-2
 ```
 
-#### Passo 4: Simular Problema de Security Group
-
-```bash
-# SIMULAÇÃO: Remover regra de entrada temporariamente
-echo "🧪 SIMULAÇÃO: Removendo regra de entrada para demonstrar problema..."
-
-# Obter regra atual (salvar para restaurar depois)
-CURRENT_RULE=$(aws ec2 describe-security-groups --group-ids $SG_ID --query 'SecurityGroups[0].IpPermissions[?FromPort==`6379`]' --region us-east-2)
-
-# Remover regra (CUIDADO: isso vai quebrar a conectividade)
-echo "⚠️  Removendo regra temporariamente..."
-# (Comando seria executado aqui, mas vamos apenas simular)
-
-# Testar conectividade (deve falhar)
-echo "🔍 Testando conectividade após remoção da regra..."
-timeout 10 redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls ping || echo "❌ Conectividade falhou como esperado"
-
-# Restaurar regra
-echo "🔧 Restaurando regra de Security Group..."
-# (Comando de restauração seria executado aqui)
-
-echo "✅ Regra restaurada - conectividade deve voltar ao normal"
-```
-
 **✅ Checkpoint:** Compreender como Security Groups afetam conectividade.
 
 ---
@@ -274,18 +246,39 @@ echo "✅ Regra restaurada - conectividade deve voltar ao normal"
 # Popular dados iniciais para estabelecer baseline
 echo "📊 Estabelecendo baseline de performance..."
 
-redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls << EOF
+# Testar conectividade primeiro (com ou sem TLS)
+if redis-cli -h $CLUSTER_ENDPOINT -p 6379 ping > /dev/null 2>&1; then
+    echo "✅ Conectividade OK (sem TLS)"
+    REDIS_CMD="redis-cli -h $CLUSTER_ENDPOINT -p 6379"
+elif redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls ping > /dev/null 2>&1; then
+    echo "✅ Conectividade OK (com TLS)"
+    REDIS_CMD="redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls"
+else
+    echo "❌ Erro de conectividade"
+    exit 1
+fi
+
 # Limpar dados existentes
-FLUSHALL
+$REDIS_CMD FLUSHALL
 
 # Inserir dados de baseline
-$(for i in {1..1000}; do echo "SET baseline:$ID:key$i value$i"; done)
+echo "Inserindo dados de baseline..."
+for i in {1..1000}; do
+    $REDIS_CMD SET "baseline:$ID:key$i" "value$i" > /dev/null
+done
 
 # Criar algumas estruturas mais complexas
-HSET user:$ID:profile name "João Silva" email "joao@example.com" age 30
-LPUSH events:$ID $(for i in {1..100}; do echo "event$i"; done)
-SADD tags:$ID $(for i in {1..50}; do echo "tag$i"; done)
-EOF
+$REDIS_CMD HSET "user:$ID:profile" name "João Silva" email "joao@example.com" age 30
+
+# Criar lista de eventos
+for i in {1..100}; do
+    $REDIS_CMD LPUSH "events:$ID" "event$i" > /dev/null
+done
+
+# Criar set de tags
+for i in {1..50}; do
+    $REDIS_CMD SADD "tags:$ID" "tag$i" > /dev/null
+done
 
 echo "✅ Dados de baseline inseridos"
 ```
@@ -296,7 +289,7 @@ echo "✅ Dados de baseline inseridos"
 1. Acesse **CloudWatch** > **Metrics**
 2. Navegue para **AWS/ElastiCache**
 3. Selecione **CacheClusterId**
-4. Encontre seu cluster `lab-troubleshoot-$ID`
+4. Encontre seu replication group `lab-troubleshoot-$ID`
 5. Selecione métricas:
    - `CPUUtilization`
    - `EngineCPUUtilization`
@@ -312,7 +305,7 @@ echo "📈 Obtendo métricas de CPU..."
 aws cloudwatch get-metric-statistics \
     --namespace AWS/ElastiCache \
     --metric-name CPUUtilization \
-    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID \
+    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID-001 \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
@@ -323,7 +316,7 @@ aws cloudwatch get-metric-statistics \
 aws cloudwatch get-metric-statistics \
     --namespace AWS/ElastiCache \
     --metric-name EngineCPUUtilization \
-    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID \
+    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID-001 \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
@@ -345,22 +338,13 @@ generate_cpu_load() {
     echo "Gerando carga por $duration segundos..."
     
     while [ $(date +%s) -lt $end_time ]; do
-        # Operações que consomem CPU
-        redis-cli -h $CLUSTER_ENDPOINT -p 6379 << EOF > /dev/null
-        # Operações de busca complexas
-        KEYS *$ID*
-        
-        # Operações de ordenação
-        SORT events:$ID ALPHA
-        
-        # Operações de interseção de conjuntos
-        SINTER tags:$ID tags:$ID
-        
-        # Operações de contagem
-        SCARD tags:$ID
-        LLEN events:$ID
-        HLEN user:$ID:profile
-EOF
+        # Operações que consomem CPU (usando variável REDIS_CMD definida anteriormente)
+        $REDIS_CMD KEYS "*$ID*" > /dev/null
+        $REDIS_CMD SORT "events:$ID" ALPHA > /dev/null
+        $REDIS_CMD SINTER "tags:$ID" "tags:$ID" > /dev/null
+        $REDIS_CMD SCARD "tags:$ID" > /dev/null
+        $REDIS_CMD LLEN "events:$ID" > /dev/null
+        $REDIS_CMD HLEN "user:$ID:profile" > /dev/null
     done
 }
 
@@ -407,7 +391,7 @@ sleep 60
 aws cloudwatch get-metric-statistics \
     --namespace AWS/ElastiCache \
     --metric-name CPUUtilization \
-    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID \
+    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID-001 \
     --start-time $(date -u -d '10 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 60 \
@@ -435,12 +419,10 @@ aws cloudwatch get-metric-statistics \
 # Obter informações de memória do Redis
 echo "🔍 Analisando uso de memória..."
 
-redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls info memory
+$REDIS_CMD info memory
 
 # Métricas específicas de interesse
-redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls << EOF
-INFO memory | grep -E "(used_memory|used_memory_human|used_memory_peak|maxmemory)"
-EOF
+$REDIS_CMD INFO memory | grep -E "(used_memory|used_memory_human|used_memory_peak|maxmemory)"
 ```
 
 #### Passo 2: Monitorar Métricas de Memória via CloudWatch
@@ -458,7 +440,7 @@ EOF
 aws cloudwatch get-metric-statistics \
     --namespace AWS/ElastiCache \
     --metric-name DatabaseMemoryUsagePercentage \
-    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID \
+    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID-001 \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
@@ -469,7 +451,7 @@ aws cloudwatch get-metric-statistics \
 aws cloudwatch get-metric-statistics \
     --namespace AWS/ElastiCache \
     --metric-name SwapUsage \
-    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID \
+    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID-001 \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
@@ -648,7 +630,7 @@ aws cloudwatch put-metric-alarm \
     --threshold 80 \
     --comparison-operator GreaterThanThreshold \
     --evaluation-periods 2 \
-    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID \
+    --dimensions Name=CacheClusterId,Value=lab-troubleshoot-$ID-001 \
     --region us-east-2
 ```
 

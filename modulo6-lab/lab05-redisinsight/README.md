@@ -177,78 +177,88 @@ echo "RedisInsight Cluster Endpoint: $INSIGHT_ENDPOINT"
 redis-cli -h $INSIGHT_ENDPOINT -p 6379 ping
 
 # Se houver erro de conexão devido à criptografia, tente com TLS:
-redis-cli -h $INSIGHT_ENDPOINT -p 6379 --tls ping
+# Testar conectividade primeiro (com ou sem TLS)
+if redis-cli -h $INSIGHT_ENDPOINT -p 6379 ping > /dev/null 2>&1; then
+    echo "✅ Conectividade OK (sem TLS)"
+    REDIS_CMD="redis-cli -h $INSIGHT_ENDPOINT -p 6379"
+elif redis-cli -h $INSIGHT_ENDPOINT -p 6379 --tls ping > /dev/null 2>&1; then
+    echo "✅ Conectividade OK (com TLS)"
+    REDIS_CMD="redis-cli -h $INSIGHT_ENDPOINT -p 6379 --tls"
+else
+    echo "❌ Erro de conectividade"
+    exit 1
+fi
 
 # Popular com dados diversos para exploração visual
 echo "📊 Populando cluster com dados interessantes para RedisInsight..."
 
-redis-cli -h $INSIGHT_ENDPOINT -p 6379 << EOF
 # Limpar dados existentes
-FLUSHALL
+$REDIS_CMD FLUSHALL
 
 # === DADOS DE E-COMMERCE (para demonstrar estruturas reais) ===
 
 # Produtos
-HSET product:$ID:1001 name "Smartphone Galaxy" price "899.99" category "electronics" stock "50" rating "4.5"
-HSET product:$ID:1002 name "Notebook Dell" price "1299.99" category "computers" stock "25" rating "4.2"
-HSET product:$ID:1003 name "Headphone Sony" price "199.99" category "audio" stock "100" rating "4.7"
+$REDIS_CMD HSET "product:$ID:1001" name "Smartphone Galaxy" price "899.99" category "electronics" stock "50" rating "4.5"
+$REDIS_CMD HSET "product:$ID:1002" name "Notebook Dell" price "1299.99" category "computers" stock "25" rating "4.2"
+$REDIS_CMD HSET "product:$ID:1003" name "Headphone Sony" price "199.99" category "audio" stock "100" rating "4.7"
 
 # Usuários
-HSET user:$ID:2001 name "João Silva" email "joao@email.com" city "São Paulo" signup_date "2024-01-15" status "active"
-HSET user:$ID:2002 name "Maria Santos" email "maria@email.com" city "Rio de Janeiro" signup_date "2024-02-20" status "active"
-HSET user:$ID:2003 name "Pedro Costa" email "pedro@email.com" city "Belo Horizonte" signup_date "2024-03-10" status "premium"
+$REDIS_CMD HSET "user:$ID:2001" name "João Silva" email "joao@email.com" city "São Paulo" signup_date "2024-01-15" status "active"
+$REDIS_CMD HSET "user:$ID:2002" name "Maria Santos" email "maria@email.com" city "Rio de Janeiro" signup_date "2024-02-20" status "active"
+$REDIS_CMD HSET "user:$ID:2003" name "Pedro Costa" email "pedro@email.com" city "Belo Horizonte" signup_date "2024-03-10" status "premium"
 
 # Carrinho de compras (listas)
-LPUSH cart:$ID:2001 "product:$ID:1001" "product:$ID:1003"
-LPUSH cart:$ID:2002 "product:$ID:1002"
-LPUSH cart:$ID:2003 "product:$ID:1001" "product:$ID:1002" "product:$ID:1003"
+$REDIS_CMD LPUSH "cart:$ID:2001" "product:$ID:1001" "product:$ID:1003"
+$REDIS_CMD LPUSH "cart:$ID:2002" "product:$ID:1002"
+$REDIS_CMD LPUSH "cart:$ID:2003" "product:$ID:1001" "product:$ID:1002" "product:$ID:1003"
 
 # Categorias (sets)
-SADD category:$ID:electronics "product:$ID:1001"
-SADD category:$ID:computers "product:$ID:1002"
-SADD category:$ID:audio "product:$ID:1003"
+$REDIS_CMD SADD "category:$ID:electronics" "product:$ID:1001"
+$REDIS_CMD SADD "category:$ID:computers" "product:$ID:1002"
+$REDIS_CMD SADD "category:$ID:audio" "product:$ID:1003"
 
 # Rankings de produtos (sorted sets)
-ZADD ranking:$ID:bestsellers 4.5 "product:$ID:1001"
-ZADD ranking:$ID:bestsellers 4.2 "product:$ID:1002"
-ZADD ranking:$ID:bestsellers 4.7 "product:$ID:1003"
+$REDIS_CMD ZADD "ranking:$ID:bestsellers" 4.5 "product:$ID:1001"
+$REDIS_CMD ZADD "ranking:$ID:bestsellers" 4.2 "product:$ID:1002"
+$REDIS_CMD ZADD "ranking:$ID:bestsellers" 4.7 "product:$ID:1003"
 
-ZADD ranking:$ID:price 899.99 "product:$ID:1001"
-ZADD ranking:$ID:price 1299.99 "product:$ID:1002"
-ZADD ranking:$ID:price 199.99 "product:$ID:1003"
+$REDIS_CMD ZADD "ranking:$ID:price" 899.99 "product:$ID:1001"
+$REDIS_CMD ZADD "ranking:$ID:price" 1299.99 "product:$ID:1002"
+$REDIS_CMD ZADD "ranking:$ID:price" 199.99 "product:$ID:1003"
 
 # Sessões ativas
-$(for i in {1..10}; do echo "SET session:$ID:sess$i user:$ID:200$((i%3+1)) EX 3600"; done)
+for i in {1..10}; do
+    user_id=$((i%3+1))
+    $REDIS_CMD SET "session:$ID:sess$i" "user:$ID:200$user_id" EX 3600 > /dev/null
+done
 
 # Cache de consultas
-SET cache:$ID:popular_products '["product:1001","product:1003","product:1002"]' EX 1800
-SET cache:$ID:categories '["electronics","computers","audio"]' EX 3600
+$REDIS_CMD SET "cache:$ID:popular_products" '["product:1001","product:1003","product:1002"]' EX 1800
+$REDIS_CMD SET "cache:$ID:categories" '["electronics","computers","audio"]' EX 3600
 
 # Contadores
-SET counter:$ID:page_views 15420
-SET counter:$ID:orders_today 87
-SET counter:$ID:active_users 234
+$REDIS_CMD SET "counter:$ID:page_views" 15420
+$REDIS_CMD SET "counter:$ID:orders_today" 87
+$REDIS_CMD SET "counter:$ID:active_users" 234
 
 # Dados JSON complexos
-SET analytics:$ID:daily '{"date":"2024-01-20","visitors":1250,"sales":15600,"top_products":["1001","1003"],"conversion_rate":3.2}'
-
-# Dados geoespaciais (se suportado)
-# GEOADD locations:$ID -46.6333 -23.5505 "São Paulo"
-# GEOADD locations:$ID -43.1729 -22.9068 "Rio de Janeiro"
+$REDIS_CMD SET "analytics:$ID:daily" '{"date":"2024-01-20","visitors":1250,"sales":15600,"top_products":["1001","1003"],"conversion_rate":3.2}'
 
 # Dados de time series (simulado)
-$(for i in {1..24}; do echo "SET metrics:$ID:hour$i:cpu $((RANDOM % 100))"; done)
-$(for i in {1..24}; do echo "SET metrics:$ID:hour$i:memory $((RANDOM % 100))"; done)
+for i in {1..24}; do
+    cpu_value=$((RANDOM % 100))
+    memory_value=$((RANDOM % 100))
+    $REDIS_CMD SET "metrics:$ID:hour$i:cpu" $cpu_value > /dev/null
+    $REDIS_CMD SET "metrics:$ID:hour$i:memory" $memory_value > /dev/null
+done
 
 # HyperLogLog para contagem aproximada
-PFADD unique_visitors:$ID user1 user2 user3 user4 user5
+$REDIS_CMD PFADD "unique_visitors:$ID" user1 user2 user3 user4 user5
 
 # Bitmap para tracking
-SETBIT active_days:$ID:user2001 1 1
-SETBIT active_days:$ID:user2001 5 1
-SETBIT active_days:$ID:user2001 10 1
-
-EOF
+$REDIS_CMD SETBIT "active_days:$ID:user2001" 1 1
+$REDIS_CMD SETBIT "active_days:$ID:user2001" 5 1
+$REDIS_CMD SETBIT "active_days:$ID:user2001" 10 1
 
 echo "✅ Dados interessantes inseridos para exploração no RedisInsight"
 ```
@@ -434,14 +444,12 @@ fi
 2. **Gerar Atividade:**
    ```bash
    # Em outro terminal, gere atividade
-   redis-cli -h localhost -p 6380 << EOF
-   GET product:$ID:1001
-   HGETALL user:$ID:2001
-   LRANGE cart:$ID:2001 0 -1
-   SMEMBERS category:$ID:electronics
-   ZRANGE ranking:$ID:bestsellers 0 -1 WITHSCORES
-   INCR counter:$ID:page_views
-   EOF
+   redis-cli -h localhost -p 6380 GET "product:$ID:1001"
+   redis-cli -h localhost -p 6380 HGETALL "user:$ID:2001"
+   redis-cli -h localhost -p 6380 LRANGE "cart:$ID:2001" 0 -1
+   redis-cli -h localhost -p 6380 SMEMBERS "category:$ID:electronics"
+   redis-cli -h localhost -p 6380 ZRANGE "ranking:$ID:bestsellers" 0 -1 WITHSCORES
+   redis-cli -h localhost -p 6380 INCR "counter:$ID:page_views"
    ```
 
 3. **Analisar Profiler:**

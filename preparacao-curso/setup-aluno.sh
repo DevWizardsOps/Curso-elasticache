@@ -14,7 +14,7 @@ yum update -y
 yum install -y aws-cli git
 
 # Instalar Redis CLI (Amazon Linux 2023)
-yum install -y redis6 redis6-doc
+yum install -y redis6 redis6-doc nc
 ln -s /usr/bin/redis6-cli /usr/bin/redis-cli
 
 # Instalar Node.js

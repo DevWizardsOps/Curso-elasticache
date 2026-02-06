@@ -178,53 +178,81 @@ echo "Data Cluster Endpoint: $DATA_ENDPOINT"
 # Testar conectividade
 redis-cli -h $DATA_ENDPOINT -p 6379 ping
 
-# Se houver erro de conexão devido à criptografia, tente com TLS:
-redis-cli -h $DATA_ENDPOINT -p 6379 --tls ping
+# Testar conectividade primeiro (com ou sem TLS)
+if redis-cli -h $DATA_ENDPOINT -p 6379 ping > /dev/null 2>&1; then
+    echo "✅ Conectividade OK (sem TLS)"
+    REDIS_CMD="redis-cli -h $DATA_ENDPOINT -p 6379"
+elif redis-cli -h $DATA_ENDPOINT -p 6379 --tls ping > /dev/null 2>&1; then
+    echo "✅ Conectividade OK (com TLS)"
+    REDIS_CMD="redis-cli -h $DATA_ENDPOINT -p 6379 --tls"
+else
+    echo "❌ Erro de conectividade"
+    exit 1
+fi
 
 # Popular com diferentes tipos de dados
 echo "📊 Populando cluster com dados diversos..."
 
-redis-cli -h $DATA_ENDPOINT -p 6379 << EOF
 # Limpar dados existentes
-FLUSHALL
+$REDIS_CMD FLUSHALL
 
 # === DADOS PEQUENOS (baseline) ===
-$(for i in {1..1000}; do echo "SET small:$ID:$i value$i"; done)
+echo "Inserindo dados pequenos..."
+for i in {1..1000}; do
+    $REDIS_CMD SET "small:$ID:$i" "value$i" > /dev/null
+done
 
 # === STRINGS GRANDES (big keys potenciais) ===
-SET big_string:$ID:1mb "$(printf 'A%.0s' {1..1048576})"
-SET big_string:$ID:500kb "$(printf 'B%.0s' {1..512000})"
-SET big_string:$ID:100kb "$(printf 'C%.0s' {1..102400})"
+echo "Criando big strings..."
+$REDIS_CMD SET "big_string:$ID:1mb" "$(printf 'A%.0s' {1..1048576})"
+$REDIS_CMD SET "big_string:$ID:500kb" "$(printf 'B%.0s' {1..512000})"
+$REDIS_CMD SET "big_string:$ID:100kb" "$(printf 'C%.0s' {1..102400})"
 
 # === LISTAS GRANDES ===
-$(for i in {1..10000}; do echo "LPUSH big_list:$ID item$i"; done)
+echo "Criando big list..."
+for i in {1..10000}; do
+    $REDIS_CMD LPUSH "big_list:$ID" "item$i" > /dev/null
+done
 
 # === HASHES GRANDES ===
-$(for i in {1..5000}; do echo "HSET big_hash:$ID field$i value$i"; done)
+echo "Criando big hash..."
+for i in {1..5000}; do
+    $REDIS_CMD HSET "big_hash:$ID" "field$i" "value$i" > /dev/null
+done
 
 # === SETS GRANDES ===
-$(for i in {1..3000}; do echo "SADD big_set:$ID member$i"; done)
+echo "Criando big set..."
+for i in {1..3000}; do
+    $REDIS_CMD SADD "big_set:$ID" "member$i" > /dev/null
+done
 
 # === SORTED SETS GRANDES ===
-$(for i in {1..2000}; do echo "ZADD big_zset:$ID $i member$i"; done)
+echo "Criando big sorted set..."
+for i in {1..2000}; do
+    $REDIS_CMD ZADD "big_zset:$ID" $i "member$i" > /dev/null
+done
 
 # === DADOS COM TTL VARIADO ===
-SET ttl_short:$ID:1 "expires in 60s" EX 60
-SET ttl_medium:$ID:1 "expires in 300s" EX 300
-SET ttl_long:$ID:1 "expires in 3600s" EX 3600
-SET no_ttl:$ID:1 "never expires"
+$REDIS_CMD SET "ttl_short:$ID:1" "expires in 60s" EX 60
+$REDIS_CMD SET "ttl_medium:$ID:1" "expires in 300s" EX 300
+$REDIS_CMD SET "ttl_long:$ID:1" "expires in 3600s" EX 3600
+$REDIS_CMD SET "no_ttl:$ID:1" "never expires"
 
 # === DADOS PARA HOT KEYS ===
-$(for i in {1..100}; do echo "SET hot_candidate:$ID:$i hotvalue$i"; done)
+echo "Criando hot key candidates..."
+for i in {1..100}; do
+    $REDIS_CMD SET "hot_candidate:$ID:$i" "hotvalue$i" > /dev/null
+done
 
 # === ESTRUTURAS ANINHADAS (JSON-like) ===
-SET json_data:$ID:user1 '{"id":1,"name":"João Silva","email":"joao@example.com","preferences":{"theme":"dark","notifications":true},"history":[1,2,3,4,5]}'
-SET json_data:$ID:user2 '{"id":2,"name":"Maria Santos","email":"maria@example.com","preferences":{"theme":"light","notifications":false},"history":[6,7,8,9,10]}'
+$REDIS_CMD SET "json_data:$ID:user1" '{"id":1,"name":"João Silva","email":"joao@example.com","preferences":{"theme":"dark","notifications":true},"history":[1,2,3,4,5]}'
+$REDIS_CMD SET "json_data:$ID:user2" '{"id":2,"name":"Maria Santos","email":"maria@example.com","preferences":{"theme":"light","notifications":false},"history":[6,7,8,9,10]}'
 
 # === DADOS DE SESSÃO ===
-$(for i in {1..200}; do echo "HSET session:$ID:$i user_id $i login_time $(date +%s) ip 192.168.1.$((i%255))"; done)
-
-EOF
+echo "Criando dados de sessão..."
+for i in {1..200}; do
+    $REDIS_CMD HSET "session:$ID:$i" user_id $i login_time $(date +%s) ip "192.168.1.$((i%255))" > /dev/null
+done
 
 echo "✅ Dados diversos inseridos no cluster"
 ```
@@ -524,9 +552,10 @@ check_ttl_patterns "small:$ID:*"
 echo "🧪 Simulando problema de expiração..."
 
 # Criar muitas chaves com TTL baixo
-redis-cli -h $DATA_ENDPOINT -p 6379 << EOF
-$(for i in {1..1000}; do echo "SET expire_test:$ID:$i value$i EX 30"; done)
-EOF
+echo "Criando chaves com TTL baixo..."
+for i in {1..1000}; do
+    $REDIS_CMD SET "expire_test:$ID:$i" "value$i" EX 30 > /dev/null
+done
 
 echo "✅ Criadas 1000 chaves com TTL de 30 segundos"
 
@@ -610,21 +639,19 @@ echo "📊 Análise de Eficiência de Estruturas:"
 # Hash vs múltiplas strings
 echo "=== Comparação Hash vs Strings ==="
 # Criar dados equivalentes
-redis-cli -h $DATA_ENDPOINT -p 6379 << EOF
 # Usando Hash (eficiente)
-HSET user_hash:$ID:1 name "João" email "joao@test.com" age "30"
+$REDIS_CMD HSET "user_hash:$ID:1" name "João" email "joao@test.com" age "30"
 
 # Usando múltiplas strings (ineficiente)
-SET user_string:$ID:1:name "João"
-SET user_string:$ID:1:email "joao@test.com"
-SET user_string:$ID:1:age "30"
-EOF
+$REDIS_CMD SET "user_string:$ID:1:name" "João"
+$REDIS_CMD SET "user_string:$ID:1:email" "joao@test.com"
+$REDIS_CMD SET "user_string:$ID:1:age" "30"
 
 # Comparar uso de memória
-HASH_SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage user_hash:$ID:1)
-STRING1_SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage user_string:$ID:1:name)
-STRING2_SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage user_string:$ID:1:email)
-STRING3_SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage user_string:$ID:1:age)
+HASH_SIZE=$($REDIS_CMD memory usage "user_hash:$ID:1")
+STRING1_SIZE=$($REDIS_CMD memory usage "user_string:$ID:1:name")
+STRING2_SIZE=$($REDIS_CMD memory usage "user_string:$ID:1:email")
+STRING3_SIZE=$($REDIS_CMD memory usage "user_string:$ID:1:age")
 STRINGS_TOTAL=$((STRING1_SIZE + STRING2_SIZE + STRING3_SIZE))
 
 echo "Hash: $HASH_SIZE bytes"
@@ -669,12 +696,10 @@ redis-cli -h $DATA_ENDPOINT -p 6379 hscan big_hash:$ID 0 COUNT 100
 echo "🔧 Estratégias de Otimização para Hot Keys:"
 
 # Estratégia 1: Replicação de hot keys (simulação)
-redis-cli -h $DATA_ENDPOINT -p 6379 << EOF
-# Replicar hot key em múltiplas chaves
-SET hot_replica:$ID:1:shard1 "$(redis-cli -h $DATA_ENDPOINT -p 6379 get hot_candidate:$ID:1)"
-SET hot_replica:$ID:1:shard2 "$(redis-cli -h $DATA_ENDPOINT -p 6379 get hot_candidate:$ID:1)"
-SET hot_replica:$ID:1:shard3 "$(redis-cli -h $DATA_ENDPOINT -p 6379 get hot_candidate:$ID:1)"
-EOF
+HOT_VALUE=$($REDIS_CMD GET "hot_candidate:$ID:1")
+$REDIS_CMD SET "hot_replica:$ID:1:shard1" "$HOT_VALUE"
+$REDIS_CMD SET "hot_replica:$ID:1:shard2" "$HOT_VALUE"
+$REDIS_CMD SET "hot_replica:$ID:1:shard3" "$HOT_VALUE"
 
 echo "✅ Hot key replicada em 3 shards para distribuir carga"
 ```
@@ -685,12 +710,10 @@ echo "✅ Hot key replicada em 3 shards para distribuir carga"
 # Configurar TTL baseado no tipo de dados
 echo "🔧 Configuração de TTL Inteligente:"
 
-redis-cli -h $DATA_ENDPOINT -p 6379 << EOF
 # TTL baseado no tipo de dados
-SET cache:$ID:user:1 "user data" EX 3600        # Cache de usuário: 1h
-SET session:$ID:abc123 "session data" EX 1800   # Sessão: 30min
-SET temp:$ID:calc "temp result" EX 300          # Resultado temporário: 5min
-EOF
+$REDIS_CMD SET "cache:$ID:user:1" "user data" EX 3600        # Cache de usuário: 1h
+$REDIS_CMD SET "session:$ID:abc123" "session data" EX 1800   # Sessão: 30min
+$REDIS_CMD SET "temp:$ID:calc" "temp result" EX 300          # Resultado temporário: 5min
 
 echo "✅ TTL configurado baseado no tipo de dados"
 ```
