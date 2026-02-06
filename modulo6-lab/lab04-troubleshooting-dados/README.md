@@ -706,26 +706,114 @@ done
 
 **Objetivo:** Identificar problemas relacionados a TTL e gerenciamento de expiração
 
+> **⏰ O QUE É TTL E POR QUE É CRUCIAL:**
+> 
+> **Analogia:** TTL (Time To Live) é como a **data de validade** nos alimentos:
+> - **Leite sem data de validade** → Pode estragar e contaminar outros alimentos
+> - **Dados sem TTL** → Podem ficar obsoletos e consumir memória desnecessariamente
+> - **Data de validade muito curta** → Desperdício (joga fora comida boa)
+> - **TTL muito baixo** → Overhead (Redis fica deletando dados úteis)
+> 
+> **No Redis, TTL gerencia o "ciclo de vida" dos dados:**
+> - **TTL = -1:** Dados "imortais" (nunca expiram) - **PERIGOSO!**
+> - **TTL = 0:** Dados já expirados (serão deletados)
+> - **TTL > 0:** Segundos restantes até expirar
+> 
+> **Por que TTL é fundamental:**
+> - ✅ **Controla crescimento de memória:** Evita acúmulo infinito
+> - ✅ **Mantém dados frescos:** Remove informações obsoletas
+> - ✅ **Otimiza performance:** Menos dados = operações mais rápidas
+> - ✅ **Previne vazamentos:** Dados temporários não ficam "esquecidos"
+> 
+> **Problemas comuns de TTL:**
+> - **Sem TTL:** Dados crescem infinitamente (vazamento de memória)
+> - **TTL muito alto:** Dados obsoletos ocupam espaço
+> - **TTL muito baixo:** Overhead de expiração constante
+> - **TTL inconsistente:** Alguns dados expiram, outros não (inconsistência)
+
 #### Passo 1: Analisar TTL das Chaves Existentes
+
+> **🔍 O QUE VAMOS INVESTIGAR:**
+> 
+> **Analogia:** Somos "inspetores de validade" verificando se os produtos na prateleira têm data de validade adequada.
+> 
+> **O comando TTL retorna:**
+> - **Número positivo:** Segundos restantes (ex: 3600 = 1 hora)
+> - **-1:** Sem TTL (nunca expira) - **ALERTA!**
+> - **-2:** Chave não existe (já expirou ou nunca existiu)
+> 
+> **Estratégia de análise:**
+> 1. **Verificar chaves de teste** (criadas com TTL diferentes)
+> 2. **Verificar big keys** (podem estar sem TTL)
+> 3. **Identificar padrões** (quais tipos têm/não têm TTL)
 
 ```bash
 # Verificar TTL de diferentes tipos de chaves
 echo "🔍 Analisando TTL das chaves..."
 
 echo "=== TTL das Chaves de Teste ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl ttl_short:$ID:1
-redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl ttl_medium:$ID:1
-redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl ttl_long:$ID:1
-redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl no_ttl:$ID:1
+$REDIS_CMD ttl ttl_short:$ID:1
+$REDIS_CMD ttl ttl_medium:$ID:1
+$REDIS_CMD ttl ttl_long:$ID:1
+$REDIS_CMD ttl no_ttl:$ID:1
 
 echo ""
 echo "=== TTL das Big Keys ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl big_string:$ID:1mb
-redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl big_list:$ID
-redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl big_hash:$ID
+$REDIS_CMD ttl big_string:$ID:1mb
+$REDIS_CMD ttl big_list:$ID
+$REDIS_CMD ttl big_hash:$ID
 ```
 
+> **📊 INTERPRETANDO OS RESULTADOS:**
+> 
+> **Exemplo de saída esperada:**
+> ```
+> TTL ttl_short:$ID:1    → 45      (45 segundos restantes)
+> TTL ttl_medium:$ID:1   → 280     (280 segundos = ~5 minutos)
+> TTL ttl_long:$ID:1     → 3540    (3540 segundos = ~1 hora)
+> TTL no_ttl:$ID:1       → -1      (SEM TTL - PROBLEMA!)
+> TTL big_string:$ID:1mb → -1      (Big key sem TTL - GRAVE!)
+> ```
+> 
+> **🚨 SINAIS DE ALERTA:**
+> - **TTL = -1 em big keys:** Memória pode crescer infinitamente
+> - **TTL = -1 em dados temporários:** Vazamento de memória
+> - **TTL muito baixo (< 60s):** Overhead de expiração
+> - **TTL inconsistente:** Alguns dados expiram, outros não
+> 
+> **💡 ANÁLISE PRÁTICA:**
+> ```
+> Cenário: E-commerce
+> 
+> ✅ BOM:
+> - Carrinho de compras: TTL 1800s (30 min)
+> - Cache de produtos: TTL 3600s (1 hora)
+> - Sessão de usuário: TTL 7200s (2 horas)
+> 
+> ❌ PROBLEMÁTICO:
+> - Dados de auditoria: TTL -1 (cresce infinitamente)
+> - Cache temporário: TTL -1 (nunca limpa)
+> - Logs de debug: TTL -1 (acumula lixo)
+> ```
+
 #### Passo 2: Identificar Chaves sem TTL
+
+> **🕵️ CAÇA AOS "IMORTAIS":**
+> 
+> **Analogia:** Vamos procurar produtos na loja que **não têm data de validade** - estes são os mais perigosos porque podem "estragar" sem aviso.
+> 
+> **Por que chaves sem TTL são problemáticas:**
+> - **Crescimento infinito:** Nunca são removidas automaticamente
+> - **Memória desperdiçada:** Dados obsoletos ocupam espaço
+> - **Performance degradada:** Mais dados = operações mais lentas
+> - **Inconsistência:** Dados antigos podem estar incorretos
+> 
+> **Estratégia de busca:**
+> 1. **SCAN em vez de KEYS:** Mais seguro em produção
+> 2. **Verificar por padrões:** big_*, session:*, cache:*
+> 3. **Calcular tamanho:** Priorizar big keys sem TTL
+> 
+> **⚠️ IMPORTANTE:** Comando KEYS é perigoso em produção (bloqueia Redis), sempre use SCAN!
 
 ```bash
 # Encontrar chaves sem TTL (TTL = -1)
@@ -737,10 +825,10 @@ check_ttl_patterns() {
     echo "Verificando padrão: $pattern"
     
     # Usar SCAN para evitar KEYS (mais seguro)
-    redis-cli -h $DATA_ENDPOINT -p 6379 --tls --scan --pattern "$pattern" | while read key; do
-        TTL=$(redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl "$key")
+    $REDIS_CMD --scan --pattern "$pattern" | while read key; do
+        TTL=$($REDIS_CMD ttl "$key")
         if [ "$TTL" = "-1" ]; then
-            SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 --tls memory usage "$key" 2>/dev/null || echo "N/A")
+            SIZE=$($REDIS_CMD memory usage "$key" 2>/dev/null || echo "N/A")
             echo "  $key: sem TTL, tamanho: $SIZE bytes"
         fi
     done
@@ -752,7 +840,65 @@ check_ttl_patterns "session:$ID:*"
 check_ttl_patterns "small:$ID:*"
 ```
 
+> **📊 INTERPRETANDO OS RESULTADOS:**
+> 
+> **Exemplo de saída esperada:**
+> ```
+> Verificando padrão: big_*:aluno01*
+>   big_string:aluno01:1mb: sem TTL, tamanho: 1048576 bytes  ← CRÍTICO!
+>   big_list:aluno01: sem TTL, tamanho: 245760 bytes         ← PROBLEMA!
+> 
+> Verificando padrão: session:aluno01:*
+>   session:aluno01:15: sem TTL, tamanho: 128 bytes          ← Menor prioridade
+>   session:aluno01:23: sem TTL, tamanho: 128 bytes
+> ```
+> 
+> **🚨 PRIORIZAÇÃO DE PROBLEMAS:**
+> 
+> **CRÍTICO (Ação imediata):**
+> - **Big keys sem TTL:** > 100KB sem expiração
+> - **Dados temporários sem TTL:** Cache, sessões, logs
+> 
+> **ALTO (Ação em breve):**
+> - **Múltiplas chaves pequenas sem TTL:** Acúmulo gradual
+> - **Dados de negócio sem TTL:** Podem ficar obsoletos
+> 
+> **MÉDIO (Monitorar):**
+> - **Configurações sem TTL:** Podem ser intencionais
+> - **Dados de referência sem TTL:** Raramente mudam
+> 
+> **💡 ESTRATÉGIAS DE CORREÇÃO:**
+> ```bash
+> # Para big keys sem TTL (URGENTE):
+> EXPIRE big_string:aluno01:1mb 3600    # 1 hora
+> 
+> # Para sessões sem TTL:
+> EXPIRE session:aluno01:15 1800        # 30 minutos
+> 
+> # Para dados temporários:
+> EXPIRE cache:temp:data 300            # 5 minutos
+> ```
+
 #### Passo 3: Simular Problema de Expiração
+
+> **🧪 LABORATÓRIO DE EXPIRAÇÃO:**
+> 
+> **Analogia:** Vamos simular uma situação onde colocamos **1000 produtos com validade de 30 segundos** na prateleira e observamos o que acontece quando todos começam a "vencer" ao mesmo tempo.
+> 
+> **O que vamos observar:**
+> - **Overhead de expiração:** Redis precisa processar muitas expirações
+> - **Impacto na performance:** CPU ocupada removendo chaves expiradas
+> - **Padrões de expiração:** Como Redis gerencia expirações em lote
+> 
+> **Por que TTL muito baixo é problemático:**
+> - **CPU overhead:** Redis gasta tempo removendo chaves constantemente
+> - **Fragmentação:** Memória fica fragmentada com criação/remoção frequente
+> - **Inconsistência:** Dados podem expirar no meio de operações
+> 
+> **Configuração do Redis para expiração:**
+> - **hz:** Frequência de verificação de expirações (padrão: 10 Hz)
+> - **Expiração ativa:** Redis remove chaves expiradas proativamente
+> - **Expiração passiva:** Remove quando chave é acessada
 
 ```bash
 # Criar chaves com TTL muito baixo para demonstrar problema
@@ -772,15 +918,54 @@ for i in {1..6}; do
     echo "=== Verificação $i ($(date '+%H:%M:%S')) ==="
     
     # Estatísticas de expiração
-    redis-cli -h $DATA_ENDPOINT -p 6379 --tls info stats | grep -E "(expired_keys|evicted_keys)"
+    $REDIS_CMD info stats | grep -E "(expired_keys|evicted_keys)"
     
     # Contar chaves restantes
-    REMAINING=$(redis-cli -h $DATA_ENDPOINT -p 6379 --tls eval "return #redis.call('keys', 'expire_test:$ID:*')" 0)
+    REMAINING=$($REDIS_CMD eval "return #redis.call('keys', 'expire_test:$ID:*')" 0)
     echo "Chaves restantes: $REMAINING"
     
     sleep 10
 done
 ```
+
+> **📊 INTERPRETANDO O MONITORAMENTO:**
+> 
+> **Estatísticas importantes:**
+> - **expired_keys:** Total de chaves que expiraram desde o início
+> - **evicted_keys:** Chaves removidas por política de memória (diferente de expiração)
+> 
+> **Exemplo de progressão esperada:**
+> ```
+> Verificação 1 (14:30:00):
+> expired_keys:0
+> Chaves restantes: 1000
+> 
+> Verificação 4 (14:30:30):  ← TTL de 30s expirando
+> expired_keys:856
+> Chaves restantes: 144
+> 
+> Verificação 6 (14:30:50):
+> expired_keys:1000
+> Chaves restantes: 0
+> ```
+> 
+> **🔍 ANÁLISE DO COMPORTAMENTO:**
+> 
+> **Expiração não é instantânea:**
+> - Redis não remove chaves exatamente no segundo da expiração
+> - Usa algoritmo probabilístico para eficiência
+> - Algumas chaves podem "sobreviver" alguns segundos extras
+> 
+> **Padrões de expiração:**
+> - **Expiração em lotes:** Redis remove várias chaves por vez
+> - **Distribuição temporal:** Não todas expiram simultaneamente
+> - **Overhead variável:** Depende da quantidade de chaves expirando
+> 
+> **🚨 SINAIS DE PROBLEMA COM TTL:**
+> - **expired_keys crescendo muito rápido:** TTL muito baixo
+> - **Chaves não expirando:** Possível problema de configuração
+> - **Performance degradada:** Overhead de expiração alto
+> - **Memória não liberando:** Fragmentação ou vazamentos
 
 #### Passo 4: Analisar Impacto de Expiração na Performance
 
