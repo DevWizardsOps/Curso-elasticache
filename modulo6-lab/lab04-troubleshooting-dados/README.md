@@ -584,9 +584,7 @@ done
 ```bash
 # Verificar configuração de expiração
 echo "🔍 Analisando configuração de expiração..."
-
-redis-cli -h $DATA_ENDPOINT -p 6379 --tls config get "*expire*"
-redis-cli -h $DATA_ENDPOINT -p 6379 --tls config get "*hz*"
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls INFO stats | grep expired_keys
 
 # Verificar estatísticas detalhadas
 echo "📈 Estatísticas de expiração e eviction:"
