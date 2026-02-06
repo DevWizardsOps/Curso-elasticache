@@ -159,7 +159,6 @@ echo "✅ Replication Group criado via CLI! Aguarde ~10-15 minutos para ficar di
 > - ✅ Failover automático (futuro)
 > 
 > **Regra prática:** Sempre use `create-replication-group` em produção!
-```
 
 #### Passo 3: Aguardar Criação e Obter Endpoint
 
@@ -179,10 +178,7 @@ echo "Data Cluster Endpoint: $DATA_ENDPOINT"
 redis-cli -h $DATA_ENDPOINT -p 6379 ping
 
 # Testar conectividade primeiro (com ou sem TLS)
-if redis-cli -h $DATA_ENDPOINT -p 6379 ping > /dev/null 2>&1; then
-    echo "✅ Conectividade OK (sem TLS)"
-    REDIS_CMD="redis-cli -h $DATA_ENDPOINT -p 6379"
-elif redis-cli -h $DATA_ENDPOINT -p 6379 --tls ping > /dev/null 2>&1; then
+if redis-cli -h $DATA_ENDPOINT -p 6379 --tls ping > /dev/null 2>&1; then
     echo "✅ Conectividade OK (com TLS)"
     REDIS_CMD="redis-cli -h $DATA_ENDPOINT -p 6379 --tls"
 else
@@ -270,10 +266,10 @@ echo "✅ Dados diversos inseridos no cluster"
 ```bash
 # Verificar uso total de memória
 echo "🔍 Analisando uso de memória..."
-redis-cli -h $DATA_ENDPOINT -p 6379 info memory | grep -E "(used_memory|used_memory_human|used_memory_peak)"
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls info memory | grep -E "(used_memory|used_memory_human|used_memory_peak)"
 
 # Contar total de chaves
-TOTAL_KEYS=$(redis-cli -h $DATA_ENDPOINT -p 6379 dbsize)
+TOTAL_KEYS=$(redis-cli -h $DATA_ENDPOINT -p 6379 --tls dbsize)
 echo "Total de chaves: $TOTAL_KEYS"
 ```
 
@@ -282,10 +278,10 @@ echo "Total de chaves: $TOTAL_KEYS"
 ```bash
 # Executar análise de big keys (pode demorar alguns minutos)
 echo "🔍 Executando análise de big keys..."
-redis-cli -h $DATA_ENDPOINT -p 6379 --bigkeys
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls --bigkeys
 
 # Salvar resultado em arquivo para análise
-redis-cli -h $DATA_ENDPOINT -p 6379 --bigkeys > /tmp/bigkeys_analysis_$ID.txt
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls --bigkeys > /tmp/bigkeys_analysis_$ID.txt
 echo "📄 Resultado salvo em /tmp/bigkeys_analysis_$ID.txt"
 ```
 
@@ -297,23 +293,23 @@ echo "🔍 Analisando chaves específicas..."
 
 # Verificar tamanho das big strings
 echo "=== Big Strings ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_string:$ID:1mb
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_string:$ID:500kb
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_string:$ID:100kb
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls memory usage big_string:$ID:1mb
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls memory usage big_string:$ID:500kb
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls memory usage big_string:$ID:100kb
 
 # Verificar tamanho das estruturas grandes
 echo "=== Big Structures ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_list:$ID
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_hash:$ID
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_set:$ID
-redis-cli -h $DATA_ENDPOINT -p 6379 memory usage big_zset:$ID
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls memory usage big_list:$ID
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls memory usage big_hash:$ID
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls memory usage big_set:$ID
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls memory usage big_zset:$ID
 
 # Verificar número de elementos
 echo "=== Contagem de Elementos ==="
-echo "Lista: $(redis-cli -h $DATA_ENDPOINT -p 6379 llen big_list:$ID) elementos"
-echo "Hash: $(redis-cli -h $DATA_ENDPOINT -p 6379 hlen big_hash:$ID) campos"
-echo "Set: $(redis-cli -h $DATA_ENDPOINT -p 6379 scard big_set:$ID) membros"
-echo "Sorted Set: $(redis-cli -h $DATA_ENDPOINT -p 6379 zcard big_zset:$ID) membros"
+echo "Lista: $(redis-cli -h $DATA_ENDPOINT -p 6379 --tls llen big_list:$ID) elementos"
+echo "Hash: $(redis-cli -h $DATA_ENDPOINT -p 6379 --tls hlen big_hash:$ID) campos"
+echo "Set: $(redis-cli -h $DATA_ENDPOINT -p 6379 --tls scard big_set:$ID) membros"
+echo "Sorted Set: $(redis-cli -h $DATA_ENDPOINT -p 6379 --tls zcard big_zset:$ID) membros"
 ```
 
 #### Passo 4: Impacto de Big Keys na Performance
@@ -325,7 +321,7 @@ echo "🧪 Testando impacto de big keys na performance..."
 # Operação custosa: obter lista completa (MUITO CUSTOSO)
 echo "Testando LRANGE em big_list..."
 START_TIME=$(date +%s%N)
-redis-cli -h $DATA_ENDPOINT -p 6379 lrange big_list:$ID 0 -1 > /dev/null
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls lrange big_list:$ID 0 -1 > /dev/null
 END_TIME=$(date +%s%N)
 LRANGE_TIME=$(( (END_TIME - START_TIME) / 1000000 ))
 echo "LRANGE completo: ${LRANGE_TIME}ms"
@@ -333,7 +329,7 @@ echo "LRANGE completo: ${LRANGE_TIME}ms"
 # Operação custosa: obter hash completo
 echo "Testando HGETALL em big_hash..."
 START_TIME=$(date +%s%N)
-redis-cli -h $DATA_ENDPOINT -p 6379 hgetall big_hash:$ID > /dev/null
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls hgetall big_hash:$ID > /dev/null
 END_TIME=$(date +%s%N)
 HGETALL_TIME=$(( (END_TIME - START_TIME) / 1000000 ))
 echo "HGETALL completo: ${HGETALL_TIME}ms"
@@ -341,7 +337,7 @@ echo "HGETALL completo: ${HGETALL_TIME}ms"
 # Comparar com operação simples
 echo "Testando GET em chave pequena..."
 START_TIME=$(date +%s%N)
-redis-cli -h $DATA_ENDPOINT -p 6379 get small:$ID:1 > /dev/null
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls get small:$ID:1 > /dev/null
 END_TIME=$(date +%s%N)
 GET_TIME=$(( (END_TIME - START_TIME) / 1000000 ))
 echo "GET simples: ${GET_TIME}ms"
@@ -372,10 +368,10 @@ echo "HGETALL big_hash: ${HGETALL_TIME}ms ($(( HGETALL_TIME / GET_TIME ))x mais 
 ```bash
 # Verificar se hot key tracking está habilitado
 echo "🔍 Verificando configuração de hot key tracking..."
-redis-cli -h $DATA_ENDPOINT -p 6379 config get "*hotkeys*"
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls config get "*hotkeys*"
 
 # Habilitar tracking de hot keys (se não estiver habilitado)
-redis-cli -h $DATA_ENDPOINT -p 6379 config set latency-tracking yes
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls config set latency-tracking yes
 ```
 
 #### Passo 2: Simular Acesso a Hot Keys
@@ -396,15 +392,15 @@ simulate_hot_keys() {
     while [ $(date +%s) -lt $end_time ]; do
         # 80% dos acessos vão para apenas 3 chaves (hot keys)
         for i in {1..8}; do
-            redis-cli -h $endpoint -p 6379 get hot_candidate:$student_id:1 > /dev/null &
-            redis-cli -h $endpoint -p 6379 get hot_candidate:$student_id:2 > /dev/null &
-            redis-cli -h $endpoint -p 6379 get hot_candidate:$student_id:3 > /dev/null &
+            redis-cli -h $endpoint -p 6379 --tls get hot_candidate:$student_id:1 > /dev/null &
+            redis-cli -h $endpoint -p 6379 --tls get hot_candidate:$student_id:2 > /dev/null &
+            redis-cli -h $endpoint -p 6379 --tls get hot_candidate:$student_id:3 > /dev/null &
         done
         
         # 20% dos acessos distribuídos entre outras chaves
         for i in {1..2}; do
             RANDOM_KEY=$((RANDOM % 100 + 4))
-            redis-cli -h $endpoint -p 6379 get hot_candidate:$student_id:$RANDOM_KEY > /dev/null &
+            redis-cli -h $endpoint -p 6379 --tls get hot_candidate:$student_id:$RANDOM_KEY > /dev/null &
         done
         
         sleep 0.1
@@ -425,7 +421,7 @@ echo "Aguarde 60 segundos para coleta de dados..."
 ```bash
 # Usar MONITOR para observar comandos (cuidado: muito verboso)
 echo "🔍 Iniciando monitoramento de comandos por 30 segundos..."
-timeout 30 redis-cli -h $DATA_ENDPOINT -p 6379 monitor | grep "hot_candidate:$ID" > /tmp/monitor_output_$ID.txt &
+timeout 30 redis-cli -h $DATA_ENDPOINT -p 6379 --tls monitor | grep "hot_candidate:$ID" > /tmp/monitor_output_$ID.txt &
 
 # Aguardar coleta de dados
 sleep 35
@@ -469,17 +465,17 @@ echo "📈 Analisando latência de comandos..."
 
 # Verificar slow log
 echo "=== Slow Log ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 slowlog get 10
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls slowlog get 10
 
 # Verificar estatísticas de comandos
 echo "=== Command Stats ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 info commandstats | head -10
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls info commandstats | head -10
 
 # Testar latência específica das hot keys
 echo "=== Latência das Hot Keys ==="
 for key in 1 2 3; do
     echo "Testando hot_candidate:$ID:$key"
-    redis-cli -h $DATA_ENDPOINT -p 6379 --latency-history -i 1 get hot_candidate:$ID:$key | head -5 &
+    redis-cli -h $DATA_ENDPOINT -p 6379 --tls --latency-history -i 1 get hot_candidate:$ID:$key | head -5 &
     sleep 2
     kill $! 2>/dev/null || true
 done
@@ -506,16 +502,16 @@ done
 echo "🔍 Analisando TTL das chaves..."
 
 echo "=== TTL das Chaves de Teste ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl ttl_short:$ID:1
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl ttl_medium:$ID:1
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl ttl_long:$ID:1
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl no_ttl:$ID:1
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl ttl_short:$ID:1
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl ttl_medium:$ID:1
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl ttl_long:$ID:1
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl no_ttl:$ID:1
 
 echo ""
 echo "=== TTL das Big Keys ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl big_string:$ID:1mb
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl big_list:$ID
-redis-cli -h $DATA_ENDPOINT -p 6379 ttl big_hash:$ID
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl big_string:$ID:1mb
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl big_list:$ID
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl big_hash:$ID
 ```
 
 #### Passo 2: Identificar Chaves sem TTL
@@ -530,10 +526,10 @@ check_ttl_patterns() {
     echo "Verificando padrão: $pattern"
     
     # Usar SCAN para evitar KEYS (mais seguro)
-    redis-cli -h $DATA_ENDPOINT -p 6379 --scan --pattern "$pattern" | while read key; do
-        TTL=$(redis-cli -h $DATA_ENDPOINT -p 6379 ttl "$key")
+    redis-cli -h $DATA_ENDPOINT -p 6379 --tls --scan --pattern "$pattern" | while read key; do
+        TTL=$(redis-cli -h $DATA_ENDPOINT -p 6379 --tls ttl "$key")
         if [ "$TTL" = "-1" ]; then
-            SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage "$key" 2>/dev/null || echo "N/A")
+            SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 --tls memory usage "$key" 2>/dev/null || echo "N/A")
             echo "  $key: sem TTL, tamanho: $SIZE bytes"
         fi
     done
@@ -565,10 +561,10 @@ for i in {1..6}; do
     echo "=== Verificação $i ($(date '+%H:%M:%S')) ==="
     
     # Estatísticas de expiração
-    redis-cli -h $DATA_ENDPOINT -p 6379 info stats | grep -E "(expired_keys|evicted_keys)"
+    redis-cli -h $DATA_ENDPOINT -p 6379 --tls info stats | grep -E "(expired_keys|evicted_keys)"
     
     # Contar chaves restantes
-    REMAINING=$(redis-cli -h $DATA_ENDPOINT -p 6379 eval "return #redis.call('keys', 'expire_test:$ID:*')" 0)
+    REMAINING=$(redis-cli -h $DATA_ENDPOINT -p 6379 --tls eval "return #redis.call('keys', 'expire_test:$ID:*')" 0)
     echo "Chaves restantes: $REMAINING"
     
     sleep 10
@@ -581,16 +577,16 @@ done
 # Verificar configuração de expiração
 echo "🔍 Analisando configuração de expiração..."
 
-redis-cli -h $DATA_ENDPOINT -p 6379 config get "*expire*"
-redis-cli -h $DATA_ENDPOINT -p 6379 config get "*hz*"
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls config get "*expire*"
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls config get "*hz*"
 
 # Verificar estatísticas detalhadas
 echo "📈 Estatísticas de expiração e eviction:"
-redis-cli -h $DATA_ENDPOINT -p 6379 info stats | grep -E "(expired_keys|evicted_keys|keyspace_hits|keyspace_misses)"
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls info stats | grep -E "(expired_keys|evicted_keys|keyspace_hits|keyspace_misses)"
 
 # Calcular hit rate
-HITS=$(redis-cli -h $DATA_ENDPOINT -p 6379 info stats | grep keyspace_hits | cut -d: -f2 | tr -d '\r')
-MISSES=$(redis-cli -h $DATA_ENDPOINT -p 6379 info stats | grep keyspace_misses | cut -d: -f2 | tr -d '\r')
+HITS=$(redis-cli -h $DATA_ENDPOINT -p 6379 --tls info stats | grep keyspace_hits | cut -d: -f2 | tr -d '\r')
+MISSES=$(redis-cli -h $DATA_ENDPOINT -p 6379 --tls info stats | grep keyspace_misses | cut -d: -f2 | tr -d '\r')
 TOTAL=$((HITS + MISSES))
 if [ $TOTAL -gt 0 ]; then
     HIT_RATE=$(( HITS * 100 / TOTAL ))
@@ -620,10 +616,10 @@ fi
 echo "📊 Análise de Big Keys por Tipo:"
 
 # Strings grandes
-redis-cli -h $DATA_ENDPOINT -p 6379 --scan --pattern "*" | while read key; do
-    TYPE=$(redis-cli -h $DATA_ENDPOINT -p 6379 type "$key")
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls --scan --pattern "*" | while read key; do
+    TYPE=$(redis-cli -h $DATA_ENDPOINT -p 6379 --tls type "$key")
     if [ "$TYPE" = "string" ]; then
-        SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 memory usage "$key" 2>/dev/null)
+        SIZE=$(redis-cli -h $DATA_ENDPOINT -p 6379 --tls memory usage "$key" 2>/dev/null)
         if [ "$SIZE" -gt 10240 ]; then  # > 10KB
             echo "Big String: $key ($SIZE bytes)"
         fi
@@ -664,10 +660,10 @@ echo "Economia com Hash: $((STRINGS_TOTAL - HASH_SIZE)) bytes ($(( (STRINGS_TOTA
 ```bash
 # Verificar fragmentação de memória
 echo "📊 Análise de Fragmentação:"
-redis-cli -h $DATA_ENDPOINT -p 6379 info memory | grep -E "(mem_fragmentation|mem_allocator)"
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls info memory | grep -E "(mem_fragmentation|mem_allocator)"
 
 # Verificar estatísticas de alocação
-redis-cli -h $DATA_ENDPOINT -p 6379 memory stats
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls memory stats
 ```
 
 ## 🛠️ Estratégias de Otimização
@@ -681,12 +677,12 @@ echo "🔧 Estratégias de Otimização para Big Keys:"
 # Estratégia 1: Paginação de listas grandes
 echo "=== Paginação de Lista Grande ==="
 # Em vez de LRANGE 0 -1 (custoso), usar paginação
-redis-cli -h $DATA_ENDPOINT -p 6379 lrange big_list:$ID 0 99  # Primeira página
-redis-cli -h $DATA_ENDPOINT -p 6379 lrange big_list:$ID 100 199  # Segunda página
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls lrange big_list:$ID 0 99  # Primeira página
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls lrange big_list:$ID 100 199  # Segunda página
 
 # Estratégia 2: Usar HSCAN em vez de HGETALL
 echo "=== Scan de Hash Grande ==="
-redis-cli -h $DATA_ENDPOINT -p 6379 hscan big_hash:$ID 0 COUNT 100
+redis-cli -h $DATA_ENDPOINT -p 6379 --tls hscan big_hash:$ID 0 COUNT 100
 ```
 
 ### 2. Otimização de Hot Keys
