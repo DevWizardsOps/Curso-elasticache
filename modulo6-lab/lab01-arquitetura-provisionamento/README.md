@@ -43,27 +43,26 @@ lab01-arquitetura-provisionamento/
 - Familiaridade com conceitos de ElastiCache
 - **ID do Aluno:** Você receberá um ID único (ex: aluno01, aluno02, etc.)
 
-## ⚠️ Importante: Escolha do Engine Redis
+## ⚠️ Importante: Navegação na Interface ElastiCache
 
-No Console AWS ElastiCache, você verá três opções de cache:
+No Console AWS ElastiCache, você passará por **3 camadas de seleção**:
 
-### 🔴 **Redis OSS** ← **USE ESTA OPÇÃO**
-- **Redis Open Source Software**
-- Versão tradicional e amplamente compatível do Redis
-- **RECOMENDADO para este curso**
-- Suporte completo a todos os recursos Redis
-- Compatível com clientes Redis padrão
+### 🔴 **1ª Camada: Tipo de Engine**
+- **Redis OSS** ← **USE ESTA OPÇÃO**
+- Valkey (NÃO usar)
+- Memcached (NÃO usar)
 
-### 🟡 **Valkey** 
-- Fork open-source do Redis (criado pela Linux Foundation)
-- Alternativa ao Redis após mudanças de licenciamento
-- **NÃO usar neste curso** (pode ter diferenças de comportamento)
+### 🟡 **2ª Camada: Tipo de Tecnologia**
+- **Cache de cluster** ← **USE ESTA OPÇÃO** (configuração manual)
+- Tecnologia sem servidor (NÃO usar - totalmente automático)
 
-### 🔵 **Memcached**
-- Sistema de cache diferente (não é Redis)
-- **NÃO usar neste curso** (protocolo e funcionalidades diferentes)
+### 🟢 **3ª Camada: Método de Criação**
+- **Cache de cluster** ← **USE ESTA OPÇÃO** (configuração completa)
+- Criação fácil (NÃO usar - templates limitados)
 
-**📋 REGRA IMPORTANTE:** Sempre selecione **"Caches do Redis OSS"** em todos os exercícios deste curso.
+**📋 SEQUÊNCIA OBRIGATÓRIA:** Redis OSS → Cache de cluster → Cache de cluster (manual)
+
+**⚠️ IMPORTANTE:** Apenas seguindo esta sequência você terá acesso às opções **Cluster Mode Disabled/Enabled** necessárias para os exercícios.
 
 ## 🏷️ Convenção de Nomenclatura
 
@@ -127,7 +126,42 @@ aws elasticache describe-cache-subnet-groups --cache-subnet-group-name elasticac
 3. Configure:
    - **Security group name:** `elasticache-lab-sg-$ID`
    - **Description:** `ElastiCache Lab Security Group for $ID`
-   - **VPC:** Selecione a VPC `ElastiCache-Lab-VPC`
+   - **VPC:** ⚠️ **IMPORTANTE:** Selecione a VPC `ElastiCache-Lab-VPC` (10.0.0.0/16)
+
+4. **Adicionar Tags (Recomendado):**
+   - Clique em **Add new tag**
+   - **Key:** `Name`
+   - **Value:** `ElastiCache Lab SG - $ID`
+   - Clique em **Add new tag** novamente
+   - **Key:** `Lab`
+   - **Value:** `Lab01`
+
+> **💡 Benefícios das Tags:**
+> - **Organização visual:** Facilita identificação no Console AWS
+> - **Filtros:** Permite buscar e filtrar recursos facilmente
+> - **Boas práticas:** Padrão recomendado pela AWS
+
+> **🚨 ATENÇÃO:** É fundamental selecionar a VPC correta (`ElastiCache-Lab-VPC`). Se selecionar a VPC errada, você receberá o erro "You have specified two resources that belong to different networks" ao tentar referenciar o security group dos alunos.
+> 
+> **💡 Como identificar a VPC correta:**
+> - **Nome:** `ElastiCache-Lab-VPC`
+> - **CIDR:** `10.0.0.0/16`
+> - **Via CLI:** `aws ec2 describe-vpcs --filters "Name=tag:Name,Values=ElastiCache-Lab-VPC" --query 'Vpcs[0].VpcId' --output text --region us-east-2`
+
+#### Alternativa: Criar via CLI (Opcional)
+
+```bash
+# Obter VPC ID
+VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=ElastiCache-Lab-VPC" --query 'Vpcs[0].VpcId' --output text --region us-east-2)
+
+# Criar Security Group com tags
+aws ec2 create-security-group \
+    --group-name "elasticache-lab-sg-$ID" \
+    --description "ElastiCache Lab Security Group for $ID" \
+    --vpc-id $VPC_ID \
+    --tag-specifications 'ResourceType=security-group,Tags=[{Key=Name,Value=ElastiCache Lab SG - '$ID'},{Key=Lab,Value=Lab01}]' \
+    --region us-east-2
+```
 
 #### Passo 2: Configurar Regras de Entrada
 
@@ -136,18 +170,72 @@ aws elasticache describe-cache-subnet-groups --cache-subnet-group-name elasticac
 2. Configure:
    - **Type:** Custom TCP
    - **Port range:** 6379
-   - **Source:** Selecione o Security Group do Bastion Host
-   - **Description:** `Redis access from Bastion Host`
+   - **Source:** 
+     - **Opção 1:** Procure e selecione `curso-elasticache-alunos-sg` na lista
+     - **Opção 2:** Se não aparecer na lista, obtenha o ID via CLI e cole:
+   - **Description:** `Redis access from EC2 instances`
+
+> **💡 Como obter o ID do Security Group via CLI:**
+> ```bash
+> # Obter ID do security group dos alunos
+> ALUNOS_SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=curso-elasticache-alunos-sg" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
+> echo "ID do Security Group dos Alunos: $ALUNOS_SG_ID"
+> ```
+> 
+> **Alternativa via Console Web:**
+> 1. Vá para **EC2** > **Security Groups**
+> 2. Procure por `curso-elasticache-alunos-sg`
+> 3. Copie o **Security group ID** (formato: sg-xxxxxxxxx)
+> 4. Cole no campo Source como "Custom"
+
+**✅ Checkpoint:** Sua regra deve mostrar `curso-elasticache-alunos-sg` ou seu ID (sg-xxxxxxxxx) como source.
+
+> **📸 Exemplo Visual no Console:**
+> - **Se aparecer na lista:** Source mostrará `curso-elasticache-alunos-sg`
+> - **Se usar ID customizado:** Source mostrará `sg-xxxxxxxxx` (onde x são caracteres alfanuméricos)
+> - **Ambos são válidos** e funcionam da mesma forma
+
+> **💡 Dica de Organização:**
+> Com as tags criadas, você pode filtrar seus security groups no Console AWS:
+> 1. Vá para **EC2** > **Security Groups**
+> 2. Use o filtro por tag: `Lab = Lab01`
+> 3. Ou procure pelo nome: `ElastiCache Lab SG - $ID`
 
 #### Passo 3: Verificar via CLI
 
 ```bash
-# Verificar Security Group criado
+# Primeiro, verificar a VPC correta
+VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=ElastiCache-Lab-VPC" --query 'Vpcs[0].VpcId' --output text --region us-east-2)
+echo "VPC ID: $VPC_ID"
+
+# Obter ID do security group dos alunos (deve estar na mesma VPC)
+ALUNOS_SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=curso-elasticache-alunos-sg" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
+echo "Security Group dos Alunos: $ALUNOS_SG_ID"
+
+# Verificar Security Group criado (deve estar na mesma VPC)
 aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --region us-east-2
 
-# Salvar Security Group ID
+# Salvar Security Group ID e verificar VPC
 SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
+SG_VPC=$(aws ec2 describe-security-groups --group-ids $SG_ID --query 'SecurityGroups[0].VpcId' --output text --region us-east-2)
+
 echo "Security Group ID: $SG_ID"
+echo "Security Group VPC: $SG_VPC"
+
+# Verificar tags (opcional)
+aws ec2 describe-security-groups --group-ids $SG_ID --query 'SecurityGroups[0].Tags' --region us-east-2
+
+# Verificar se estão na mesma VPC
+if [ "$VPC_ID" = "$SG_VPC" ]; then
+    echo "✅ Security Groups estão na mesma VPC"
+else
+    echo "❌ ERRO: Security Groups estão em VPCs diferentes!"
+    echo "VPC Lab: $VPC_ID"
+    echo "VPC SG: $SG_VPC"
+fi
+
+# Verificar se a regra foi criada corretamente
+aws ec2 describe-security-groups --group-ids $SG_ID --query 'SecurityGroups[0].IpPermissions' --region us-east-2
 ```
 
 **✅ Checkpoint:** Confirme que seu Security Group foi criado com as regras corretas.
@@ -168,8 +256,15 @@ echo "Security Group ID: $SG_ID"
    - **Caches do Memcached**
    - **Caches do Redis OSS** ← **SELECIONE ESTA OPÇÃO**
 3. Clique em **Caches do Redis OSS**
-4. Clique em **Create Redis cluster**
-5. Configure:
+4. Agora você verá duas opções de tecnologia:
+   - **🚫 Tecnologia sem servidor** (NÃO usar - totalmente automático)
+   - **✅ Cache de cluster** ← **SELECIONE ESTA OPÇÃO**
+5. Clique em **Cache de cluster**
+6. Você verá duas opções de criação:
+   - **Criação fácil** (templates pré-definidos)
+   - **✅ Cache de cluster** ← **SELECIONE ESTA OPÇÃO** (configuração manual)
+7. Clique em **Cache de cluster** (configuração manual)
+8. Configure:
    - **Cluster mode:** Disabled
    - **Cluster info:**
      - **Name:** `lab-cluster-disabled-$ID`
@@ -186,6 +281,11 @@ echo "Security Group ID: $SG_ID"
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
      - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
+   - **Advanced settings:**
+     - **Tags (Recomendado):**
+       - **Key:** `Name` **Value:** `Lab Cluster Disabled - $ID`
+       - **Key:** `Lab` **Value:** `Lab01`
+       - **Key:** `Mode` **Value:** `Disabled`
 
 4. Clique em **Create**
 
@@ -236,8 +336,15 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-
    - **Caches do Memcached**
    - **Caches do Redis OSS** ← **SELECIONE ESTA OPÇÃO**
 3. Clique em **Caches do Redis OSS**
-4. Clique em **Create Redis cluster**
-5. Configure:
+4. Agora você verá duas opções de tecnologia:
+   - **🚫 Tecnologia sem servidor** (NÃO usar - totalmente automático)
+   - **✅ Cache de cluster** ← **SELECIONE ESTA OPÇÃO**
+5. Clique em **Cache de cluster**
+6. Você verá duas opções de criação:
+   - **Criação fácil** (templates pré-definidos)
+   - **✅ Cache de cluster** ← **SELECIONE ESTA OPÇÃO** (configuração manual)
+7. Clique em **Cache de cluster** (configuração manual)
+8. Configure:
    - **Cluster mode:** Enabled
    - **Cluster info:**
      - **Name:** `lab-cluster-enabled-$ID`
@@ -255,6 +362,11 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
      - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
+   - **Advanced settings:**
+     - **Tags (Recomendado):**
+       - **Key:** `Name` **Value:** `Lab Cluster Enabled - $ID`
+       - **Key:** `Lab` **Value:** `Lab01`
+       - **Key:** `Mode` **Value:** `Enabled`
 
 4. Clique em **Create**
 
@@ -393,12 +505,30 @@ aws ec2 delete-security-group --group-id $SG_ID --region us-east-2
    - Verifique se está em us-east-2
    - Configure AWS CLI: `aws configure set region us-east-2`
 
-2. **Engine Incorreto**
+2. **Seleção incorreta na interface**
+   - ⚠️ **SEQUÊNCIA CORRETA:** Redis OSS → Cache de cluster → Cache de cluster (manual)
+   - **NÃO use:** Valkey, Memcached, Serverless, ou Criação fácil
+   - **Se errou:** Use "Back" ou cancele e recomece
+   - **Sintoma:** Não consegue encontrar opções Cluster Mode Disabled/Enabled
+
+3. **Engine Incorreto**
    - ⚠️ **SEMPRE use "Caches do Redis OSS"**
    - NÃO use Valkey ou Memcached
    - Se criou com engine errado, delete e recrie
 
-3. **Cluster não provisiona**
+3. **Erro "different networks" ao criar regra**
+   - ⚠️ **CAUSA:** Security groups estão em VPCs diferentes
+   - **SOLUÇÃO:** Verifique se criou o security group na VPC `ElastiCache-Lab-VPC`
+   - **VERIFICAR:** Via CLI: `aws ec2 describe-security-groups --group-ids SEU_SG_ID --query 'SecurityGroups[0].VpcId' --output text`
+   - **CORRIGIR:** Delete o security group e recrie na VPC correta
+
+4. **Security Group não aparece no dropdown**
+   - **CAUSA:** Pode estar em VPC diferente ou interface não carregou
+   - **SOLUÇÃO 1:** Vá para **EC2** > **Security Groups** e procure por `curso-elasticache-alunos-sg`
+   - **SOLUÇÃO 2:** Copie o ID (sg-xxxxxxxxx) e use "Custom" no campo Source
+   - **VIA CLI:** `aws ec2 describe-security-groups --filters "Name=group-name,Values=curso-elasticache-alunos-sg" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2`
+
+4. **Cluster não provisiona**
    - Verifique se subnet group existe
    - Confirme que Security Group está na VPC correta
    - Valide quotas da conta AWS

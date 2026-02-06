@@ -2,46 +2,82 @@
 
 ## 🔴 Mudança na Interface AWS ElastiCache
 
-A AWS atualizou a interface do ElastiCache e agora oferece **três opções** na página inicial:
+A AWS atualizou a interface do ElastiCache com **múltiplas camadas de seleção**:
 
-### 1. 🔴 **Caches do Redis OSS** ← **USE ESTA OPÇÃO**
+### **1ª Camada: Tipo de Engine**
+
+Na página inicial você verá **três opções**:
+
+#### 1. 🔴 **Caches do Redis OSS** ← **USE ESTA OPÇÃO**
 - **Redis Open Source Software**
 - Versão tradicional e amplamente compatível do Redis
 - **OBRIGATÓRIO para todos os labs deste curso**
 - Suporte completo a todos os recursos Redis
 - Compatível com clientes Redis padrão
 
-### 2. 🟡 **Caches do Valkey** ❌ **NÃO USAR**
+#### 2. 🟡 **Caches do Valkey** ❌ **NÃO USAR**
 - Fork open-source do Redis (criado pela Linux Foundation)
 - Alternativa ao Redis após mudanças de licenciamento
 - **Pode ter diferenças de comportamento**
 - **NÃO compatível com este curso**
 
-### 3. 🔵 **Caches do Memcached** ❌ **NÃO USAR**
+#### 3. 🔵 **Caches do Memcached** ❌ **NÃO USAR**
 - Sistema de cache diferente (não é Redis)
 - **Protocolo e funcionalidades completamente diferentes**
 - **NÃO é Redis**
 
-## 📋 REGRA OBRIGATÓRIA
+### **2ª Camada: Tipo de Tecnologia**
+
+Após selecionar **"Caches do Redis OSS"**, você verá **duas opções**:
+
+#### 1. � **Tecnologia sem servidor** ❌ **NÃO USAR**
+- **Totalmente automático** (sem controle de configuração)
+- **NÃO permite** escolher Cluster Mode Disabled/Enabled
+- **NÃO adequado** para fins educativos
+- **Pula** todas as configurações que queremos aprender
+
+#### 2. ✅ **Cache de cluster** ← **USE ESTA OPÇÃO**
+- **Configuração manual** completa
+- **Permite** escolher Cluster Mode Disabled/Enabled
+- **Adequado** para aprendizado
+- **Controle total** sobre todas as configurações
+
+### **3ª Camada: Método de Criação**
+
+Após selecionar **"Cache de cluster"**, você verá **duas opções**:
+
+#### 1. 🟡 **Criação fácil** ❌ **NÃO USAR**
+- Templates pré-definidos (Produção, Dev, Demonstração)
+- **Configuração limitada**
+- **NÃO permite** configurações específicas do lab
+
+#### 2. ✅ **Cache de cluster** ← **USE ESTA OPÇÃO**
+- **Configuração manual** completa
+- **Permite** todas as configurações necessárias
+- **Adequado** para os exercícios do curso
+
+## 📋 SEQUÊNCIA OBRIGATÓRIA
 
 **Em TODOS os labs (Lab 01 ao Lab 05):**
 
 1. Acesse **ElastiCache** no Console AWS
-2. **SEMPRE** selecione **"Caches do Redis OSS"**
-3. Nunca use Valkey ou Memcached
-4. Prossiga com **"Create Redis cluster"**
+2. **1ª Seleção:** **"Caches do Redis OSS"**
+3. **2ª Seleção:** **"Cache de cluster"** (não serverless)
+4. **3ª Seleção:** **"Cache de cluster"** (não criação fácil)
+5. Agora você pode configurar **Cluster Mode Disabled/Enabled**
 
-## 🚨 Se Criou com Engine Errado
+## 🚨 Se Selecionou Errado
 
-Se você acidentalmente criou um cluster com Valkey ou Memcached:
+Se você selecionou qualquer opção incorreta:
 
-1. **Delete o cluster imediatamente**
-2. Aguarde a deleção completa
-3. **Recrie usando "Caches do Redis OSS"**
+1. **Volte** usando o botão "Back" ou "Voltar"
+2. **Ou cancele** e comece novamente
+3. **Siga a sequência** correta acima
+4. **Nunca** use Valkey, Memcached, Serverless ou Criação Fácil
 
 ## 📚 Labs Atualizados
 
-Todos os labs foram atualizados com essas instruções:
+Todos os labs foram atualizados com essas instruções detalhadas:
 
 - ✅ **Lab 01** - Arquitetura e Provisionamento
 - ✅ **Lab 02** - Simulando Failover  
@@ -51,9 +87,13 @@ Todos os labs foram atualizados com essas instruções:
 
 ## 🎯 Resumo
 
-**SEMPRE use "Caches do Redis OSS" em todos os exercícios!**
+**Sequência obrigatória:**
+1. **Redis OSS** (não Valkey/Memcached)
+2. **Cache de cluster** (não Serverless)
+3. **Cache de cluster** (não Criação fácil)
+4. **Cluster Mode Disabled/Enabled** (conforme exercício)
 
 ---
 
-*Documento criado em: 06/02/2026*  
-*Motivo: Atualização da interface AWS ElastiCache*
+*Documento atualizado em: 06/02/2026*  
+*Motivo: Nova interface AWS ElastiCache com múltiplas camadas*

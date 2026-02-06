@@ -74,8 +74,9 @@ aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-l
 
 1. Acesse **ElastiCache** no Console AWS
 2. Na página inicial, selecione **"Caches do Redis OSS"** ← **IMPORTANTE**
-3. Clique em **Create Redis cluster**
-4. Configure:
+3. Selecione **"Cache de cluster"** (não serverless)
+4. Selecione **"Cache de cluster"** (configuração manual, não criação fácil)
+5. Configure:
    - **Cluster mode:** Disabled
    - **Cluster info:**
      - **Name:** `lab-data-$ID`
