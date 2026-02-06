@@ -309,7 +309,7 @@ aws cloudwatch get-metric-statistics \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
-    --statistics Average,Maximum \
+    --statistics Average Maximum \
     --region us-east-2
 
 # Métricas específicas do Redis Engine
@@ -320,7 +320,7 @@ aws cloudwatch get-metric-statistics \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
-    --statistics Average,Maximum \
+    --statistics Average Maximum \
     --region us-east-2
 ```
 
@@ -395,7 +395,7 @@ aws cloudwatch get-metric-statistics \
     --start-time $(date -u -d '10 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 60 \
-    --statistics Average,Maximum \
+    --statistics Average Maximum \
     --region us-east-2
 ```
 
@@ -444,7 +444,7 @@ aws cloudwatch get-metric-statistics \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
-    --statistics Average,Maximum \
+    --statistics Average Maximum \
     --region us-east-2
 
 # Métricas de swap
@@ -455,7 +455,7 @@ aws cloudwatch get-metric-statistics \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
-    --statistics Average,Maximum \
+    --statistics Average Maximum \
     --region us-east-2
 ```
 

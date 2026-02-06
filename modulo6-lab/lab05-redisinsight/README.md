@@ -558,7 +558,7 @@ fi
 aws cloudwatch get-metric-statistics \
     --namespace AWS/ElastiCache \
     --metric-name CPUUtilization \
-    --dimensions Name=CacheClusterId,Value=lab-insight-$ID \
+    --dimensions Name=CacheClusterId,Value=lab-insight-$ID-001 \
     --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
     --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
     --period 300 \
