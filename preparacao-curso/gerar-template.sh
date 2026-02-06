@@ -27,14 +27,6 @@ Parameters:
     Default: 'aluno'
     Description: 'Prefixo para nomes dos alunos'
     
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-    Description: 'VPC onde criar as instancias'
-    
-  SubnetId:
-    Type: AWS::EC2::Subnet::Id
-    Description: 'Subnet publica para as instancias'
-    
   AllowedCIDR:
     Type: String
     Default: '0.0.0.0/0'
@@ -121,13 +113,222 @@ done
 cat >> setup-curso-elasticache-dynamic.yaml << 'EOF_RESOURCES'
 
 Resources:
+  # VPC Compartilhada para o Curso ElastiCache
+  ElastiCacheVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: '10.0.0.0/16'
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-VPC
+        - Key: Lab
+          Value: Lab01
+        - Key: Purpose
+          Value: ElastiCache-Learning
+
+  # Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-IGW
+        - Key: Lab
+          Value: Lab01
+
+  # Attach Internet Gateway to VPC
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref ElastiCacheVPC
+
+  # Subnets Públicas (para EC2 dos alunos)
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref ElastiCacheVPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: '10.0.1.0/24'
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Public-Subnet-1
+        - Key: Lab
+          Value: Lab01
+        - Key: Type
+          Value: Public
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref ElastiCacheVPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: '10.0.2.0/24'
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Public-Subnet-2
+        - Key: Lab
+          Value: Lab01
+        - Key: Type
+          Value: Public
+
+  PublicSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref ElastiCacheVPC
+      AvailabilityZone: !Select [2, !GetAZs '']
+      CidrBlock: '10.0.3.0/24'
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Public-Subnet-3
+        - Key: Lab
+          Value: Lab01
+        - Key: Type
+          Value: Public
+
+  # Subnets Privadas (para ElastiCache)
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref ElastiCacheVPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: '10.0.11.0/24'
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Private-Subnet-1
+        - Key: Lab
+          Value: Lab01
+        - Key: Type
+          Value: Private
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref ElastiCacheVPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: '10.0.12.0/24'
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Private-Subnet-2
+        - Key: Lab
+          Value: Lab01
+        - Key: Type
+          Value: Private
+
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref ElastiCacheVPC
+      AvailabilityZone: !Select [2, !GetAZs '']
+      CidrBlock: '10.0.13.0/24'
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Private-Subnet-3
+        - Key: Lab
+          Value: Lab01
+        - Key: Type
+          Value: Private
+
+  # Route Table para Subnets Públicas
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref ElastiCacheVPC
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Public-RT
+        - Key: Lab
+          Value: Lab01
+
+  # Route para Internet Gateway
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  # Associações das Subnets Públicas
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  PublicSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet3
+
+  # Route Table para Subnets Privadas
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref ElastiCacheVPC
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Private-RT
+        - Key: Lab
+          Value: Lab01
+
+  # Associações das Subnets Privadas
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet2
+
+  PrivateSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet3
+
+  # ElastiCache Subnet Group (usando as 3 subnets privadas)
+  ElastiCacheSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      CacheSubnetGroupName: elasticache-lab-subnet-group
+      Description: Subnet group for ElastiCache Lab 01
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+        - !Ref PrivateSubnet3
+      Tags:
+        - Key: Name
+          Value: ElastiCache-Lab-Subnet-Group
+        - Key: Lab
+          Value: Lab01
+
   # Security Group para alunos
   AlunosSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName: !Sub '${AWS::StackName}-alunos-sg'
       GroupDescription: 'Security Group para instancias dos alunos'
-      VpcId: !Ref VpcId
+      VpcId: !Ref ElastiCacheVPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 22
@@ -147,7 +348,7 @@ Resources:
     Properties:
       GroupName: !Sub '${AWS::StackName}-elasticache-sg'
       GroupDescription: 'Security Group para ElastiCache'
-      VpcId: !Ref VpcId
+      VpcId: !Ref ElastiCacheVPC
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 6379
@@ -300,6 +501,14 @@ EOF_RESOURCES
 for i in $(seq 1 $NUM_ALUNOS); do
     ALUNO_NUM=$(printf "%02d" $i)
     
+    # Calcular qual subnet usar (distribuir entre as 3 subnets públicas)
+    SUBNET_INDEX=$(((i - 1) % 3))
+    case $SUBNET_INDEX in
+        0) SUBNET_REF="!Ref PublicSubnet1" ;;
+        1) SUBNET_REF="!Ref PublicSubnet2" ;;
+        2) SUBNET_REF="!Ref PublicSubnet3" ;;
+    esac
+    
     cat >> setup-curso-elasticache-dynamic.yaml << EOF_ALUNO
 
   # Recursos do Aluno ${ALUNO_NUM}
@@ -329,7 +538,7 @@ for i in $(seq 1 $NUM_ALUNOS); do
       KeyName: !Ref KeyPairName
       SecurityGroupIds:
         - !Ref AlunosSecurityGroup
-      SubnetId: !Ref SubnetId
+      SubnetId: ${SUBNET_REF}
       IamInstanceProfile: !Ref EC2InstanceProfile
       UserData:
         Fn::Base64: !Sub 
@@ -374,6 +583,18 @@ Outputs:
   AccountId:
     Description: 'Account ID'
     Value: !Ref AWS::AccountId
+    
+  VPCId:
+    Description: 'VPC ID da VPC compartilhada'
+    Value: !Ref ElastiCacheVPC
+    Export:
+      Name: !Sub '${AWS::StackName}-VPC-ID'
+    
+  ElastiCacheSubnetGroup:
+    Description: 'Nome do ElastiCache Subnet Group'
+    Value: !Ref ElastiCacheSubnetGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-ElastiCache-SubnetGroup'
     
   SecurityGroupElastiCache:
     Description: 'Security Group ID para ElastiCache'

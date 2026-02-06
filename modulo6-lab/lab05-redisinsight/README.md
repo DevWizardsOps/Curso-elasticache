@@ -64,13 +64,6 @@ Todos os recursos criados devem seguir o padrão:
 #### Passo 1: Verificar Pré-requisitos
 
 ```bash
-# Definir seu ID (ALTERE AQUI)
-ID="aluno01"
-
-# Verificar região
-aws configure get region
-# Deve retornar: us-east-2
-
 # Verificar se RedisInsight está instalado
 which redisinsight || echo "RedisInsight não encontrado - será instalado"
 ```

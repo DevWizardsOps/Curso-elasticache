@@ -61,20 +61,7 @@ Todos os recursos criados devem seguir o padrão:
 
 **Objetivo:** Verificar que a VPC e Subnet Group compartilhados estão disponíveis
 
-#### Passo 1: Verificar Região
-
-Confirme que está na região correta:
-
-```bash
-# Via AWS CLI
-aws configure get region
-# Deve retornar: us-east-2
-
-# Se não estiver configurado, configure:
-aws configure set region us-east-2
-```
-
-#### Passo 2: Verificar VPC Compartilhada
+#### Passo 1: Verificar VPC Compartilhada
 
 **Via Console Web:**
 1. Acesse **VPC** no Console AWS
@@ -91,7 +78,7 @@ VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=ElastiCache-Lab-V
 echo "VPC ID: $VPC_ID"
 ```
 
-#### Passo 3: Verificar Subnet Group Compartilhado
+#### Passo 2: Verificar Subnet Group Compartilhado
 
 **Via Console Web:**
 1. Acesse **ElastiCache** > **Subnet Groups**
@@ -133,9 +120,6 @@ aws elasticache describe-cache-subnet-groups --cache-subnet-group-name elasticac
 #### Passo 3: Verificar via CLI
 
 ```bash
-# Substituir $ID pelo seu ID real
-ID="aluno01"  # ALTERE AQUI
-
 # Verificar Security Group criado
 aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --region us-east-2
 

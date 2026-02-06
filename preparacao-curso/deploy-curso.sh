@@ -98,28 +98,16 @@ else
     ACTION="create-stack"
 fi
 
-# Obter VPC padrão
-log "Obtendo VPC padrão..."
-VPC_ID=$(aws ec2 describe-vpcs --filters "Name=is-default,Values=true" --query 'Vpcs[0].VpcId' --output text)
-
-if [ "$VPC_ID" = "None" ] || [ -z "$VPC_ID" ]; then
-    error "VPC padrão não encontrada. Você precisa especificar uma VPC manualmente."
-    read -p "Digite o ID da VPC: " VPC_ID
+# Verificar se a região está configurada
+log "Verificando região AWS..."
+CURRENT_REGION=$(aws configure get region)
+if [ "$CURRENT_REGION" != "$REGION" ]; then
+    warning "Região atual ($CURRENT_REGION) diferente da esperada ($REGION)"
+    log "Configurando região para $REGION..."
+    aws configure set region $REGION
 fi
 
-# Obter subnet pública
-log "Obtendo subnet pública..."
-SUBNET_ID=$(aws ec2 describe-subnets \
-    --filters "Name=vpc-id,Values=$VPC_ID" "Name=map-public-ip-on-launch,Values=true" \
-    --query 'Subnets[0].SubnetId' --output text)
-
-if [ "$SUBNET_ID" = "None" ] || [ -z "$SUBNET_ID" ]; then
-    error "Subnet pública não encontrada na VPC $VPC_ID"
-    read -p "Digite o ID da subnet pública: " SUBNET_ID
-fi
-
-success "VPC: $VPC_ID"
-success "Subnet: $SUBNET_ID"
+success "Região configurada: $REGION"
 
 # Configurar CIDR permitido para SSH
 echo ""
@@ -417,8 +405,6 @@ fi
 log "Parâmetros do CloudFormation:"
 log "  NumeroAlunos: $NUM_ALUNOS"
 log "  PrefixoAluno: $PREFIXO_ALUNO"
-log "  VpcId: $VPC_ID"
-log "  SubnetId: $SUBNET_ID"
 log "  AllowedCIDR: $ALLOWED_CIDR"
 log "  KeyPairName: $KEY_NAME"
 log "  ConsolePasswordSecret: $SECRET_NAME"
@@ -430,8 +416,6 @@ aws cloudformation $ACTION \
     --parameters \
         ParameterKey=NumeroAlunos,ParameterValue="$NUM_ALUNOS" \
         ParameterKey=PrefixoAluno,ParameterValue="$PREFIXO_ALUNO" \
-        ParameterKey=VpcId,ParameterValue="$VPC_ID" \
-        ParameterKey=SubnetId,ParameterValue="$SUBNET_ID" \
         ParameterKey=AllowedCIDR,ParameterValue="$ALLOWED_CIDR" \
         ParameterKey=KeyPairName,ParameterValue="$KEY_NAME" \
         ParameterKey=ConsolePasswordSecret,ParameterValue="$SECRET_NAME" \

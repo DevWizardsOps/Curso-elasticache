@@ -63,13 +63,6 @@ Todos os recursos criados devem seguir o padrão:
 #### Passo 1: Verificar Pré-requisitos
 
 ```bash
-# Definir seu ID (ALTERE AQUI)
-ID="aluno01"
-
-# Verificar região
-aws configure get region
-# Deve retornar: us-east-2
-
 # Verificar Security Group do Lab 01
 aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --region us-east-2
 ```
