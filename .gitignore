@@ -7,6 +7,8 @@ preparacao-curso/setup-curso-elasticache-dynamic.yaml
 preparacao-curso/alunos-ips.txt
 preparacao-curso/.ssh-key-info
 preparacao-curso/curso-elasticache-info-*.html
+preparacao-curso-documentdb
+preparacao-curso-documentdb/*
 
 # Logs
 *.log
