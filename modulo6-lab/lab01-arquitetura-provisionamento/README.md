@@ -572,30 +572,20 @@ Para este laboratório, usamos configurações de segurança básicas mas recome
 
 ```bash
 # Para Cluster Mode Disabled
-redis-cli -h $ENDPOINT_DISABLED -p 6379 ping
-redis-cli -h $ENDPOINT_DISABLED -p 6379 set "test-$ID" "Hello from $ID"
-redis-cli -h $ENDPOINT_DISABLED -p 6379 get "test-$ID"
-
-# Se houver erro de conexão, tente com TLS:
-# redis-cli -h $ENDPOINT_DISABLED -p 6379 --tls ping
+redis-cli -h $ENDPOINT_DISABLED -p 6379 --tls ping
+redis-cli -h $ENDPOINT_DISABLED -p 6379 --tls set "test-$ID" "Hello from $ID"
+redis-cli -h $ENDPOINT_DISABLED -p 6379 --tls get "test-$ID"
 
 # Para Cluster Mode Enabled (modo cluster)
-redis-cli -h $ENDPOINT_ENABLED -p 6379 -c ping
-redis-cli -h $ENDPOINT_ENABLED -p 6379 -c set "test-cluster-$ID" "Hello cluster from $ID"
-redis-cli -h $ENDPOINT_ENABLED -p 6379 -c get "test-cluster-$ID"
-
-# Se houver erro de conexão, tente com TLS:
-# redis-cli -h $ENDPOINT_ENABLED -p 6379 -c --tls ping
+redis-cli -h $ENDPOINT_ENABLED -p 6379 --tls -c ping
+redis-cli -h $ENDPOINT_ENABLED -p 6379 --tls -c set "test-cluster-$ID" "Hello cluster from $ID"
+redis-cli -h $ENDPOINT_ENABLED -p 6379 --tls -c get "test-cluster-$ID"
 ```
 
 ### Comparando Informações dos Clusters
 
 ```bash
 # Informações detalhadas do cluster disabled
-# Tente primeiro como cache cluster:
-aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-$ID --show-cache-node-info --region us-east-2 2>/dev/null
-
-# Se não funcionar, tente como replication group:
 aws elasticache describe-replication-groups --replication-group-id lab-cluster-disabled-$ID --region us-east-2
 
 # Informações detalhadas do cluster enabled
