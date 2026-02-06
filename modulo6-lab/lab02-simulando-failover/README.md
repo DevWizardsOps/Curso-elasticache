@@ -124,7 +124,7 @@ SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=elast
 # Criar replication group com todas as configurações
 aws elasticache create-replication-group \
     --replication-group-id "lab-failover-$ID" \
-    --description "Lab failover cluster for $ID" \
+    --replication-group-description "Lab failover cluster for $ID" \
     --num-cache-clusters 3 \
     --cache-node-type cache.t3.micro \
     --engine redis \
