@@ -639,7 +639,7 @@ redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls info memory | grep -E "(mem_fragmen
 redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls info stats | grep -E "(evicted_keys|expired_keys)"
 
 # Verificar configuração de maxmemory
-redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls config get maxmemory*
+redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls INFO memory | grep -E "(maxmemory|maxmemory_policy|used_memory|used_memory_rss|used_memory_peak)"
 ```
 
 **Sinais de Problema de Memória:**
