@@ -359,7 +359,16 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-
 > - **Multi-AZ Desabilitado:** Cluster fica em uma única zona de disponibilidade (mais simples para este lab)
 > - **Failover automático Desabilitado:** Sem failover automático (adequado para exercício básico)
 
-> **⚠️ Nota Importante:** Dependendo da configuração, a AWS pode criar o cluster como um **Replication Group** mesmo no modo "Disabled". Isso é normal e não afeta a funcionalidade. Use os comandos alternativos fornecidos se receber erro "CacheClusterNotFound".
+> **⚠️ Nota Importante sobre Tipos de Recursos:** 
+> 
+> No ElastiCache para Redis, quando você cria com **Cluster Mode Disabled**, a AWS normalmente cria o recurso principal como **Replication Group** (mesmo que você tenha "só 1 nó" e "sem réplicas"). Isso acontece porque:
+> 
+> - **Cache Cluster** = visão "antiga/clássica" (muito usada em Memcached e fluxos legados do Redis)
+> - **Replication Group** = visão "moderna"/padrão do Redis, que suporta Multi-AZ, failover, réplicas, backups, maintenance, etc.
+> 
+> **Isso é normal e não afeta a funcionalidade!** Use os comandos alternativos fornecidos se receber erro "CacheClusterNotFound".
+> 
+> 📚 **Documentação oficial:** [Working with Redis replication groups](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Replication.html)
 
 **✅ Checkpoint:** Cluster deve estar no status "available" com endpoint acessível.
 
@@ -510,6 +519,29 @@ aws elasticache describe-replication-groups --replication-group-id lab-cluster-e
 - **Desenvolvimento/Teste:** Multi-AZ Desabilitado + Failover Desabilitado
 - **Produção:** Multi-AZ Enabled + Failover Habilitado
 - **Lab 01:** Usamos configurações diferentes para demonstrar ambos os cenários
+
+### 📊 Cache Cluster vs Replication Group
+
+#### **Por que meu cluster foi criado como Replication Group?**
+
+No ElastiCache para Redis moderno, a AWS prefere criar **Replication Groups** mesmo para configurações simples porque:
+
+**Cache Cluster (Abordagem Clássica):**
+- ✅ Simples e direto
+- ✅ Compatível com Memcached
+- ❌ Recursos limitados
+- ❌ Menos flexibilidade para crescimento
+
+**Replication Group (Abordagem Moderna):**
+- ✅ Suporte completo a Multi-AZ
+- ✅ Failover automático disponível
+- ✅ Backups e maintenance windows
+- ✅ Fácil adição de réplicas futuras
+- ✅ Melhor integração com recursos AWS
+
+> **💡 Resumo:** Mesmo com "Cluster Mode Disabled" e "1 nó apenas", a AWS cria um Replication Group porque oferece mais recursos e flexibilidade para o futuro.
+> 
+> 📚 **Para saber mais:** [Working with Redis replication groups](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Replication.html)
 
 ### 🔒 Configurações de Segurança
 
@@ -670,16 +702,17 @@ aws ec2 delete-security-group --group-id $SG_ID --region us-east-2
    - Verifique se está usando o usuário IAM correto
 
 7. **Erro "CacheClusterNotFound" mas cluster existe no Console**
-   - **CAUSA:** Cluster foi criado como Replication Group em vez de Cache Cluster
-   - **SOLUÇÃO:** Use comandos alternativos:
+   - **CAUSA:** Cluster foi criado como **Replication Group** (comportamento moderno da AWS)
+   - **NORMAL:** AWS prefere Replication Groups para Redis por oferecerem mais recursos
+   - **SOLUÇÃO:** Use comandos para Replication Group:
      ```bash
-     # Em vez de describe-cache-clusters, use:
+     # Status do cluster:
      aws elasticache describe-replication-groups --replication-group-id lab-cluster-disabled-$ID --region us-east-2
      
-     # Para obter endpoint:
+     # Obter endpoint:
      aws elasticache describe-replication-groups --replication-group-id lab-cluster-disabled-$ID --query 'ReplicationGroups[0].NodeGroups[0].PrimaryEndpoint.Address' --output text --region us-east-2
      ```
-   - **NORMAL:** Isso não afeta a funcionalidade do cluster
+   - **FUNCIONALIDADE:** Idêntica ao Cache Cluster, apenas comandos diferentes
 
 8. **Problemas com criptografia**
    - **Criptografia em trânsito habilitada:** Use `redis-cli` com `--tls`
