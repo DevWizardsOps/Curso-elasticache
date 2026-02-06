@@ -327,18 +327,18 @@ aws cloudwatch get-metric-statistics \
 # Script para simular alta utilização de CPU
 echo "🧪 SIMULAÇÃO: Gerando carga de CPU..."
 
-> **💡 NOTA IMPORTANTE:**
-> 
-> **Por que a simulação anterior gerava apenas 5% de CPU?**
-> - Operações individuais são muito rápidas
-> - cache.t3.micro tem recursos limitados mas ainda assim eficiente
-> - Comandos sequenciais não saturam o processador
-> 
-> **Nova abordagem mais efetiva:**
-> - Múltiplos processos paralelos (3 geradores)
-> - Operações custosas em loop contínuo
-> - Comandos KEYS, SORT, LRANGE que consomem mais CPU
-> - Execução simultânea para saturar recursos
+#**💡 NOTA IMPORTANTE:**
+#
+#**Por que a simulação anterior gerava apenas 5% de CPU?**
+#- Operações individuais são muito rápidas
+#- cache.t3.micro tem recursos limitados mas ainda assim eficiente
+#- Comandos sequenciais não saturam o processador
+#
+#**Nova abordagem mais efetiva:**
+#- Múltiplos processos paralelos (3 geradores)
+#- Operações custosas em loop contínuo
+#- Comandos KEYS, SORT, LRANGE que consomem mais CPU
+#- Execução simultânea para saturar recursos
 
 # Função para gerar carga intensiva
 generate_cpu_load() {
@@ -463,7 +463,6 @@ echo "✅ Simulação de carga intensiva concluída"
 > ```
 > 
 > **⚠️ CUIDADO:** Esta versão pode impactar significativamente o cluster!
-```
 
 #### Passo 4: Analisar Impacto da Alta CPU
 
