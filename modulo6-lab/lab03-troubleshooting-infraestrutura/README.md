@@ -246,12 +246,9 @@ aws ec2 describe-security-groups --group-ids $SG_ID --query 'SecurityGroups[0].I
 # Popular dados iniciais para estabelecer baseline
 echo "📊 Estabelecendo baseline de performance..."
 
-# Testar conectividade primeiro (com ou sem TLS)
-if redis-cli -h $CLUSTER_ENDPOINT -p 6379 ping > /dev/null 2>&1; then
-    echo "✅ Conectividade OK (sem TLS)"
-    REDIS_CMD="redis-cli -h $CLUSTER_ENDPOINT -p 6379"
-elif redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls ping > /dev/null 2>&1; then
-    echo "✅ Conectividade OK (com TLS)"
+# Testar conectividade primeiro
+if redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls ping > /dev/null 2>&1; then
+    echo "✅ Conectividade OK "
     REDIS_CMD="redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls"
 else
     echo "❌ Erro de conectividade"
@@ -330,42 +327,85 @@ aws cloudwatch get-metric-statistics \
 # Script para simular alta utilização de CPU
 echo "🧪 SIMULAÇÃO: Gerando carga de CPU..."
 
-# Função para gerar carga
+> **💡 NOTA IMPORTANTE:**
+> 
+> **Por que a simulação anterior gerava apenas 5% de CPU?**
+> - Operações individuais são muito rápidas
+> - cache.t3.micro tem recursos limitados mas ainda assim eficiente
+> - Comandos sequenciais não saturam o processador
+> 
+> **Nova abordagem mais efetiva:**
+> - Múltiplos processos paralelos (3 geradores)
+> - Operações custosas em loop contínuo
+> - Comandos KEYS, SORT, LRANGE que consomem mais CPU
+> - Execução simultânea para saturar recursos
+
+# Função para gerar carga intensiva
 generate_cpu_load() {
     local duration=$1
     local end_time=$(($(date +%s) + duration))
     
-    echo "Gerando carga por $duration segundos..."
+    echo "Gerando carga intensiva por $duration segundos..."
     
     while [ $(date +%s) -lt $end_time ]; do
-        # Operações que consomem CPU (usando variável REDIS_CMD definida anteriormente)
-        $REDIS_CMD KEYS "*$ID*" > /dev/null
-        $REDIS_CMD SORT "events:$ID" ALPHA > /dev/null
-        $REDIS_CMD SINTER "tags:$ID" "tags:$ID" > /dev/null
-        $REDIS_CMD SCARD "tags:$ID" > /dev/null
-        $REDIS_CMD LLEN "events:$ID" > /dev/null
-        $REDIS_CMD HLEN "user:$ID:profile" > /dev/null
+        # Executar múltiplas operações custosas em paralelo
+        for j in {1..5}; do
+            (
+                # Operações que consomem muito CPU
+                $REDIS_CMD KEYS "*$ID*" > /dev/null 2>&1
+                $REDIS_CMD SORT "events:$ID" ALPHA > /dev/null 2>&1
+                $REDIS_CMD SORT "events:$ID" DESC > /dev/null 2>&1
+                
+                # Operações de interseção custosas
+                $REDIS_CMD SINTER "tags:$ID" "tags:$ID" > /dev/null 2>&1
+                $REDIS_CMD SUNION "tags:$ID" "tags:$ID" > /dev/null 2>&1
+                
+                # Operações de contagem
+                $REDIS_CMD SCARD "tags:$ID" > /dev/null 2>&1
+                $REDIS_CMD LLEN "events:$ID" > /dev/null 2>&1
+                $REDIS_CMD HLEN "user:$ID:profile" > /dev/null 2>&1
+                
+                # Operações de busca custosas
+                $REDIS_CMD LRANGE "events:$ID" 0 -1 > /dev/null 2>&1
+                $REDIS_CMD HGETALL "user:$ID:profile" > /dev/null 2>&1
+                
+                # Operações matemáticas custosas
+                for k in {1..10}; do
+                    $REDIS_CMD INCR "temp:counter:$j:$k" > /dev/null 2>&1
+                    $REDIS_CMD DECR "temp:counter:$j:$k" > /dev/null 2>&1
+                done
+            ) &
+        done
+        
+        # Aguardar um pouco antes da próxima rodada
+        sleep 0.1
+        
+        # Limitar número de processos background
+        wait
     done
 }
 
-# Executar carga em background
-generate_cpu_load 180 &
-LOAD_PID=$!
+# Executar múltiplas instâncias de carga em paralelo
+echo "Iniciando múltiplos geradores de carga..."
+for i in {1..3}; do
+    generate_cpu_load 180 &
+    LOAD_PIDS[$i]=$!
+done
 
-echo "🔍 Monitorando CPU durante carga..."
+echo "🔍 Monitorando CPU durante carga intensiva..."
 for i in {1..6}; do
     echo "=== Verificação $i ($(date)) ==="
     
-    # Testar latência
+    # Testar latência com comando correto
     START_TIME=$(date +%s%N)
-    redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls ping > /dev/null
+    $REDIS_CMD ping > /dev/null
     END_TIME=$(date +%s%N)
     LATENCY=$(( (END_TIME - START_TIME) / 1000000 ))
     echo "Latência PING: ${LATENCY}ms"
     
     # Testar operação simples
     START_TIME=$(date +%s%N)
-    redis-cli -h $CLUSTER_ENDPOINT -p 6379 --tls GET baseline:$ID:key1 > /dev/null
+    $REDIS_CMD GET "baseline:$ID:key1" > /dev/null
     END_TIME=$(date +%s%N)
     LATENCY=$(( (END_TIME - START_TIME) / 1000000 ))
     echo "Latência GET: ${LATENCY}ms"
@@ -373,9 +413,56 @@ for i in {1..6}; do
     sleep 30
 done
 
-# Parar geração de carga
-kill $LOAD_PID 2>/dev/null || true
-echo "✅ Simulação de carga concluída"
+# Parar todos os geradores de carga
+echo "Parando geradores de carga..."
+for i in {1..3}; do
+    kill ${LOAD_PIDS[$i]} 2>/dev/null || true
+done
+wait 2>/dev/null || true
+
+# Limpar chaves temporárias criadas durante o teste
+echo "Limpando dados temporários..."
+$REDIS_CMD DEL $(for i in {1..5}; do for k in {1..10}; do echo "temp:counter:$i:$k"; done; done) > /dev/null 2>&1
+
+echo "✅ Simulação de carga intensiva concluída"
+```
+
+> **🔧 ALTERNATIVA PARA CARGA MAIS ALTA:**
+> 
+> Se ainda assim a CPU não subir significativamente, use esta versão mais agressiva:
+> 
+> ```bash
+> # Versão MUITO mais agressiva (use com cuidado)
+> echo "🚨 CARGA EXTREMA: Gerando carga máxima de CPU..."
+> 
+> # Função para carga extrema
+> extreme_cpu_load() {
+>     while true; do
+>         # Operações extremamente custosas
+>         $REDIS_CMD KEYS "*" > /dev/null 2>&1  # MUITO custoso
+>         $REDIS_CMD SORT "events:$ID" ALPHA LIMIT 0 1000 > /dev/null 2>&1
+>         $REDIS_CMD LRANGE "events:$ID" 0 -1 > /dev/null 2>&1
+>         
+>         # Criar e deletar dados rapidamente
+>         for x in {1..100}; do
+>             $REDIS_CMD SET "stress:$x" "$(date +%s%N)" > /dev/null 2>&1
+>             $REDIS_CMD GET "stress:$x" > /dev/null 2>&1
+>             $REDIS_CMD DEL "stress:$x" > /dev/null 2>&1
+>         done
+>     done
+> }
+> 
+> # Executar 5 processos de carga extrema
+> for i in {1..5}; do
+>     extreme_cpu_load &
+>     EXTREME_PIDS[$i]=$!
+> done
+> 
+> echo "⚠️  CARGA EXTREMA ATIVA - Monitore por 2-3 minutos e pare:"
+> echo "kill ${EXTREME_PIDS[@]}"
+> ```
+> 
+> **⚠️ CUIDADO:** Esta versão pode impactar significativamente o cluster!
 ```
 
 #### Passo 4: Analisar Impacto da Alta CPU
@@ -404,6 +491,23 @@ aws cloudwatch get-metric-statistics \
 - ✅ EngineCPUUtilization > 90%
 - ✅ Aumento na latência de operações simples
 - ✅ Timeout em operações complexas
+
+> **📊 ENTENDENDO CPU EM cache.t3.micro:**
+> 
+> **Por que é difícil saturar CPU em t3.micro?**
+> - **Burstable Performance:** t3.micro pode usar créditos de CPU
+> - **Redis é eficiente:** Operações simples são muito rápidas
+> - **Single-threaded:** Redis usa principalmente 1 core
+> - **Memória limitada:** 0.5GB limita o dataset antes da CPU
+> 
+> **Cenários reais de alta CPU:**
+> - Comandos KEYS em datasets grandes (>100k chaves)
+> - Operações SORT em listas grandes (>10k elementos)
+> - SUNION/SINTER em sets grandes
+> - Múltiplas conexões simultâneas
+> - Scripts Lua complexos
+> 
+> **Em produção, use instâncias maiores** (m6g.large+) para demonstrações mais realistas.
 
 **✅ Checkpoint:** Correlacionar alta CPU com degradação de performance.
 
