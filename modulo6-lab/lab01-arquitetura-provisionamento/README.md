@@ -481,7 +481,7 @@ aws elasticache describe-replication-groups --replication-group-id lab-cluster-e
 | **Complexidade** | Baixa | Média |
 | **Endpoints** | Único endpoint | Configuration endpoint |
 | **Distribuição** | Não | Automática |
-| **Multi-AZ** | Opcional (Desabilitado no lab) | Recomendado (Enabled no lab) |
+| **Multi-AZ** | Opcional (Desabilitado no lab) | Recomendado (Habilitado no lab) |
 | **Failover automático** | Opcional (Desabilitado no lab) | Recomendado (Habilitado no lab) |
 | **Criptografia** | Habilitada (ambos) | Habilitada (ambos) |
 | **Controle de acesso** | Nenhum (lab) | Nenhum (lab) |
