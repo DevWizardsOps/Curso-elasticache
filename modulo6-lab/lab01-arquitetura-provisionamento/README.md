@@ -272,6 +272,7 @@ aws ec2 describe-security-groups --group-ids $SG_ID --query 'SecurityGroups[0].I
    - **Location:**
      - **AWS Cloud**
      - **Multi-AZ:** Disabled (para este lab)
+     - **Failover automático:** Desabilitado (para este lab)
    - **Cluster settings:**
      - **Engine version:** 7.0
      - **Port:** 6379
@@ -318,6 +319,10 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-
 - ✅ Endpoint único e direto
 - ❌ Limitações de escalabilidade horizontal
 
+> **💡 Explicação das Configurações:**
+> - **Multi-AZ Disabled:** Cluster fica em uma única zona de disponibilidade (mais simples para este lab)
+> - **Failover automático Desabilitado:** Sem failover automático (adequado para exercício básico)
+
 **✅ Checkpoint:** Cluster deve estar no status "available" com endpoint acessível.
 
 ---
@@ -352,6 +357,7 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-
    - **Location:**
      - **AWS Cloud**
      - **Multi-AZ:** Enabled
+     - **Failover automático:** Habilitado (recomendado para cluster enabled)
    - **Cluster settings:**
      - **Engine version:** 7.0
      - **Port:** 6379
@@ -400,6 +406,10 @@ aws elasticache describe-replication-groups --replication-group-id lab-cluster-e
 - ✅ Alta disponibilidade com Multi-AZ
 - ❌ Complexidade adicional de configuração
 
+> **💡 Explicação das Configurações:**
+> - **Multi-AZ Enabled:** Cluster distribuído em múltiplas zonas de disponibilidade (alta disponibilidade)
+> - **Failover automático Habilitado:** Failover automático em caso de falha (recomendado para produção)
+
 **✅ Checkpoint:** Cluster deve estar "available" com múltiplos node groups.
 
 ---
@@ -414,6 +424,8 @@ aws elasticache describe-replication-groups --replication-group-id lab-cluster-e
 | **Complexidade** | Baixa | Média |
 | **Endpoints** | Único endpoint | Configuration endpoint |
 | **Distribuição** | Não | Automática |
+| **Multi-AZ** | Opcional (Disabled no lab) | Recomendado (Enabled no lab) |
+| **Failover automático** | Opcional (Desabilitado no lab) | Recomendado (Habilitado no lab) |
 | **Casos de Uso** | Aplicações simples | Aplicações de grande escala |
 
 ### Quando Usar Cada Modo
@@ -429,6 +441,25 @@ aws elasticache describe-replication-groups --replication-group-id lab-cluster-e
 - Necessidade de distribuição de dados
 - Crescimento horizontal
 - Ambientes de produção críticos
+
+### 🔧 Entendendo Multi-AZ e Failover Automático
+
+#### **Multi-AZ (Multi-Availability Zone)**
+- **Enabled:** Distribui nós em múltiplas zonas de disponibilidade
+- **Disabled:** Mantém todos os nós em uma única zona
+- **Benefício:** Proteção contra falhas de zona inteira
+- **Custo:** Ligeiramente maior devido à distribuição
+
+#### **Failover Automático**
+- **Habilitado:** Sistema detecta falhas e promove réplicas automaticamente
+- **Desabilitado:** Failover deve ser feito manualmente
+- **Benefício:** Recuperação automática sem intervenção
+- **Requisito:** Necessita de réplicas para funcionar
+
+#### **Combinações Recomendadas**
+- **Desenvolvimento/Teste:** Multi-AZ Disabled + Failover Desabilitado
+- **Produção:** Multi-AZ Enabled + Failover Habilitado
+- **Lab 01:** Usamos configurações diferentes para demonstrar ambos os cenários
 
 ## 📊 Testando Conectividade dos Seus Clusters
 
