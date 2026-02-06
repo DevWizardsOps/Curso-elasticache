@@ -122,32 +122,51 @@ Para acelerar o processo, você pode criar o cluster via CLI:
 VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=ElastiCache-Lab-VPC" --query 'Vpcs[0].VpcId' --output text --region us-east-2)
 SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=elasticache-lab-sg-$ID" --query 'SecurityGroups[0].GroupId' --output text --region us-east-2)
 
-# Criar cluster com todas as configurações
-aws elasticache create-cache-cluster \
-    --cache-cluster-id "lab-insight-$ID" \
+# IMPORTANTE: Para ter criptografia via CLI, devemos usar Replication Group (mesmo com 1 nó)
+# create-cache-cluster NÃO suporta parâmetros de criptografia
+aws elasticache create-replication-group \
+    --replication-group-id "lab-insight-$ID" \
+    --replication-group-description "RedisInsight with encryption" \
+    --num-cache-clusters 1 \
     --cache-node-type cache.t3.micro \
     --engine redis \
     --engine-version 7.0 \
     --port 6379 \
-    --num-cache-nodes 1 \
     --cache-subnet-group-name elasticache-lab-subnet-group \
     --security-group-ids $SG_ID \
+    --at-rest-encryption-enabled \
+    --transit-encryption-enabled \
     --auto-minor-version-upgrade \
     --tags Key=Name,Value="Lab RedisInsight - $ID" Key=Lab,Value=Lab05 Key=Purpose,Value=Visual-Monitoring \
     --region us-east-2
 
-echo "✅ Cluster criado via CLI! Aguarde ~10-15 minutos para ficar disponível."
-echo "⚠️  Nota: Para criptografia em clusters simples, configure via Parameter Groups ou use Replication Groups."
+echo "✅ Replication Group criado via CLI! Aguarde ~10-15 minutos para ficar disponível."
+```
+
+> **🏗️ PONTO ARQUITETURAL IMPORTANTE:**
+> 
+> **Por que usar `create-replication-group` em vez de `create-cache-cluster`?**
+> 
+> - **`create-cache-cluster`:** Comando legado, NÃO suporta criptografia
+> - **`create-replication-group`:** Comando moderno, suporta todas as funcionalidades
+> 
+> **Mesmo para 1 nó único**, use `create-replication-group` se precisar de:
+> - ✅ Criptografia (at-rest e in-transit)
+> - ✅ Backups automáticos
+> - ✅ Multi-AZ (futuro)
+> - ✅ Failover automático (futuro)
+> 
+> **Regra prática:** Sempre use `create-replication-group` em produção!
 ```
 
 #### Passo 3: Aguardar Criação e Obter Endpoint
 
 ```bash
 # Monitorar criação
-watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-insight-$ID --query 'CacheClusters[0].CacheClusterStatus' --output text --region us-east-2"
+watch -n 30 "aws elasticache describe-replication-groups --replication-group-id lab-insight-$ID --query 'ReplicationGroups[0].Status' --output text --region us-east-2"
 
 # Quando disponível, obter endpoint
-INSIGHT_ENDPOINT=$(aws elasticache describe-cache-clusters --cache-cluster-id lab-insight-$ID --show-cache-node-info --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text --region us-east-2)
+INSIGHT_ENDPOINT=$(aws elasticache describe-replication-groups --replication-group-id lab-insight-$ID --query 'ReplicationGroups[0].NodeGroups[0].PrimaryEndpoint.Address' --output text --region us-east-2)
 echo "RedisInsight Cluster Endpoint: $INSIGHT_ENDPOINT"
 ```
 
@@ -567,8 +586,8 @@ pkill -f redisinsight
 # Fechar túneis SSH
 pkill -f "ssh.*$INSIGHT_ENDPOINT"
 
-# Deletar cluster
-aws elasticache delete-cache-cluster --cache-cluster-id lab-insight-$ID --region us-east-2
+# Deletar replication group
+aws elasticache delete-replication-group --replication-group-id lab-insight-$ID --region us-east-2
 
 # Limpar arquivos temporários
 rm -f /tmp/setup_tunnel_$ID.sh

@@ -145,15 +145,15 @@ echo "⚠️  Nota: Para criptografia em clusters simples, configure via Paramet
 #### Passo 3: Monitorar Criação e Obter Informações
 
 ```bash
-# Monitorar status do cluster
-watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$ID --query 'CacheClusters[0].CacheClusterStatus' --output text --region us-east-2"
+# Monitorar status do replication group
+watch -n 30 "aws elasticache describe-replication-groups --replication-group-id lab-troubleshoot-$ID --query 'ReplicationGroups[0].Status' --output text --region us-east-2"
 
 # Quando disponível, obter endpoint
-CLUSTER_ENDPOINT=$(aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$ID --show-cache-node-info --query 'CacheClusters[0].CacheNodes[0].Endpoint.Address' --output text --region us-east-2)
+CLUSTER_ENDPOINT=$(aws elasticache describe-replication-groups --replication-group-id lab-troubleshoot-$ID --query 'ReplicationGroups[0].NodeGroups[0].PrimaryEndpoint.Address' --output text --region us-east-2)
 echo "Cluster Endpoint: $CLUSTER_ENDPOINT"
 
 # Obter informações detalhadas
-aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$ID --show-cache-node-info --region us-east-2
+aws elasticache describe-replication-groups --replication-group-id lab-troubleshoot-$ID --region us-east-2
 ```
 
 **✅ Checkpoint:** Cluster deve estar "available" e endpoint acessível.
@@ -658,11 +658,11 @@ aws cloudwatch put-metric-alarm \
 
 ### Via CLI:
 ```bash
-# Deletar cluster de troubleshooting
-aws elasticache delete-cache-cluster --cache-cluster-id lab-troubleshoot-$ID --region us-east-2
+# Deletar replication group de troubleshooting
+aws elasticache delete-replication-group --replication-group-id lab-troubleshoot-$ID --region us-east-2
 
 # Monitorar deleção
-watch -n 30 "aws elasticache describe-cache-clusters --cache-cluster-id lab-troubleshoot-$ID --region us-east-2 2>/dev/null || echo 'Cluster deletado com sucesso'"
+watch -n 30 "aws elasticache describe-replication-groups --replication-group-id lab-troubleshoot-$ID --region us-east-2 2>/dev/null || echo 'Replication Group deletado com sucesso'"
 
 # Deletar alarmes criados (opcional)
 aws cloudwatch delete-alarms --alarm-names "ElastiCache-HighCPU-$ID" --region us-east-2
