@@ -282,11 +282,21 @@ aws ec2 describe-security-groups --group-ids $SG_ID --query 'SecurityGroups[0].I
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
      - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
+   - **Security (Segurança):**
+     - **Criptografia em repouso:** Habilitada (recomendado)
+     - **Chave de criptografia:** Chave padrão (AWS managed)
+     - **Criptografia em trânsito:** Habilitada (recomendado)
+     - **Controle de acesso:** Nenhum controle de acesso (para simplicidade do lab)
    - **Advanced settings:**
      - **Tags (Recomendado):**
        - **Key:** `Name` **Value:** `Lab Cluster Disabled - $ID`
        - **Key:** `Lab` **Value:** `Lab01`
        - **Key:** `Mode` **Value:** `Disabled`
+
+> **📚 Para saber mais sobre segurança:**
+> - [Criptografia no ElastiCache](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
+> - [Controle de acesso Redis AUTH](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/auth.html)
+> - [Boas práticas de segurança](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/security.html)
 
 4. Clique em **Create**
 
@@ -368,11 +378,21 @@ aws elasticache describe-cache-clusters --cache-cluster-id lab-cluster-disabled-
      - **Network type:** IPv4
      - **Subnet group:** `elasticache-lab-subnet-group`
      - **Security groups:** Selecione seu SG `elasticache-lab-sg-$ID`
+   - **Security (Segurança):**
+     - **Criptografia em repouso:** Habilitada (recomendado)
+     - **Chave de criptografia:** Chave padrão (AWS managed)
+     - **Criptografia em trânsito:** Habilitada (recomendado)
+     - **Controle de acesso:** Nenhum controle de acesso (para simplicidade do lab)
    - **Advanced settings:**
      - **Tags (Recomendado):**
        - **Key:** `Name` **Value:** `Lab Cluster Enabled - $ID`
        - **Key:** `Lab` **Value:** `Lab01`
        - **Key:** `Mode` **Value:** `Enabled`
+
+> **📚 Para saber mais sobre segurança:**
+> - [Criptografia no ElastiCache](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
+> - [Controle de acesso Redis AUTH](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/auth.html)
+> - [Boas práticas de segurança](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/security.html)
 
 4. Clique em **Create**
 
@@ -426,6 +446,8 @@ aws elasticache describe-replication-groups --replication-group-id lab-cluster-e
 | **Distribuição** | Não | Automática |
 | **Multi-AZ** | Opcional (Desabilitado no lab) | Recomendado (Enabled no lab) |
 | **Failover automático** | Opcional (Desabilitado no lab) | Recomendado (Habilitado no lab) |
+| **Criptografia** | Habilitada (ambos) | Habilitada (ambos) |
+| **Controle de acesso** | Nenhum (lab) | Nenhum (lab) |
 | **Casos de Uso** | Aplicações simples | Aplicações de grande escala |
 
 ### Quando Usar Cada Modo
@@ -461,9 +483,32 @@ aws elasticache describe-replication-groups --replication-group-id lab-cluster-e
 - **Produção:** Multi-AZ Enabled + Failover Habilitado
 - **Lab 01:** Usamos configurações diferentes para demonstrar ambos os cenários
 
+### 🔒 Configurações de Segurança
+
+Para este laboratório, usamos configurações de segurança básicas mas recomendadas:
+
+#### **Criptografia em Repouso**
+- **Habilitada:** Protege dados armazenados no disco
+- **Chave padrão:** AWS gerencia as chaves automaticamente
+- **Benefício:** Conformidade e proteção de dados sensíveis
+
+#### **Criptografia em Trânsito**
+- **Habilitada:** Protege dados durante transmissão
+- **Protocolo:** TLS/SSL entre cliente e cluster
+- **Benefício:** Proteção contra interceptação de dados
+
+#### **Controle de Acesso**
+- **Nenhum:** Simplifica conexão para fins educativos
+- **Alternativas:** Redis AUTH, IAM authentication
+- **Produção:** Sempre configure autenticação adequada
+
+> **⚠️ Importante:** Em ambientes de produção, sempre configure controle de acesso adequado. Para este lab, focamos na simplicidade para facilitar o aprendizado dos conceitos fundamentais.
+
 ## 📊 Testando Conectividade dos Seus Clusters
 
 ### Conectividade via Bastion Host
+
+> **⚠️ Nota sobre Criptografia:** Como habilitamos criptografia em trânsito, você pode precisar usar `--tls` em alguns casos. Para este lab, testamos primeiro sem TLS para simplicidade.
 
 ```bash
 # Para Cluster Mode Disabled
@@ -471,10 +516,16 @@ redis-cli -h $ENDPOINT_DISABLED -p 6379 ping
 redis-cli -h $ENDPOINT_DISABLED -p 6379 set "test-$ID" "Hello from $ID"
 redis-cli -h $ENDPOINT_DISABLED -p 6379 get "test-$ID"
 
+# Se houver erro de conexão, tente com TLS:
+# redis-cli -h $ENDPOINT_DISABLED -p 6379 --tls ping
+
 # Para Cluster Mode Enabled (modo cluster)
 redis-cli -h $ENDPOINT_ENABLED -p 6379 -c ping
 redis-cli -h $ENDPOINT_ENABLED -p 6379 -c set "test-cluster-$ID" "Hello cluster from $ID"
 redis-cli -h $ENDPOINT_ENABLED -p 6379 -c get "test-cluster-$ID"
+
+# Se houver erro de conexão, tente com TLS:
+# redis-cli -h $ENDPOINT_ENABLED -p 6379 -c --tls ping
 ```
 
 ### Comparando Informações dos Clusters
@@ -577,6 +628,11 @@ aws ec2 delete-security-group --group-id $SG_ID --region us-east-2
 6. **Erro de permissão**
    - Confirme que tem permissões ElastiCache
    - Verifique se está usando o usuário IAM correto
+
+7. **Problemas com criptografia**
+   - **Criptografia em trânsito habilitada:** Use `redis-cli` com `--tls`
+   - **Erro de conexão:** Verifique se cliente suporta TLS
+   - **Documentação:** [ElastiCache Encryption](https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/encryption.html)
 
 ## 🎯 Objetivos de Aprendizado Alcançados
 
