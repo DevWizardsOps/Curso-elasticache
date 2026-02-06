@@ -132,13 +132,12 @@ aws elasticache create-cache-cluster \
     --num-cache-nodes 1 \
     --cache-subnet-group-name elasticache-lab-subnet-group \
     --security-group-ids $SG_ID \
-    --at-rest-encryption-enabled \
-    --transit-encryption-enabled \
     --auto-minor-version-upgrade \
     --tags Key=Name,Value="Lab RedisInsight - $ID" Key=Lab,Value=Lab05 Key=Purpose,Value=Visual-Monitoring \
     --region us-east-2
 
 echo "✅ Cluster criado via CLI! Aguarde ~10-15 minutos para ficar disponível."
+echo "⚠️  Nota: Para criptografia em clusters simples, configure via Parameter Groups ou use Replication Groups."
 ```
 
 #### Passo 3: Aguardar Criação e Obter Endpoint
