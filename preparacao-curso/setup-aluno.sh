@@ -81,11 +81,8 @@ alias ll='ls -lah'
 alias curso='cd ~/Curso-elasticache'
 alias awsid='aws sts get-caller-identity'
 
-# Mostrar boas-vindas no primeiro login
-if [ -f ~/BEM-VINDO.txt ] && [ ! -f ~/.welcome_shown ]; then
-    cat ~/BEM-VINDO.txt
-    touch ~/.welcome_shown
-fi
+# Mostrar boas-vindas
+cat ~/BEM-VINDO.txt
 
 export ID=ALUNO_ID_PLACEHOLDER
 EOFBASHRC

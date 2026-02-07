@@ -2,6 +2,27 @@
 
 Laboratório focado na observabilidade visual avançada do ElastiCache na região **us-east-2**, utilizando RedisInsight para transformar o Redis de "black box" em "glass box", proporcionando visibilidade completa sobre estruturas de dados, performance e comportamento em tempo real.
 
+> **🎯 POR QUE ESTE LABORATÓRIO É REVOLUCIONÁRIO:**
+> 
+> **Analogia:** Imagine que você sempre dirigiu carros sem painel - sem velocímetro, sem indicador de combustível, sem nada. Você só sabia que o carro funcionava ou não. O RedisInsight é como instalar um **painel completo** no seu Redis.
+> 
+> **Transformação "Black Box" → "Glass Box":**
+> - **Antes:** `redis-cli` = dirigir no escuro, só comandos de texto
+> - **Depois:** RedisInsight = painel completo, visão 360° do Redis
+> 
+> **O que você vai ganhar:**
+> - **👁️ Visão em tempo real:** Ver dados fluindo pelo Redis
+> - **🔍 Análise visual:** Identificar problemas instantaneamente  
+> - **📊 Métricas integradas:** Performance, memória, comandos
+> - **🛠️ Debugging avançado:** Profiler, slow log, análise de dados
+> - **🎯 Produtividade 10x:** Horas de debugging → minutos de análise visual
+> 
+> **Casos de uso reais:**
+> - **Desenvolvedor:** "Por que minha aplicação está lenta?"
+> - **DevOps:** "Qual chave está consumindo toda a memória?"
+> - **Arquiteto:** "Como os dados estão distribuídos?"
+> - **DBA:** "Quais comandos estão causando gargalos?"
+
 ## 📋 Objetivos do Laboratório
 
 - Configurar RedisInsight para acesso seguro via Bastion Host
@@ -267,125 +288,682 @@ echo "✅ Dados interessantes inseridos para exploração no RedisInsight"
 
 ---
 
-### Exercício 2: Configurar Túnel SSH e RedisInsight (10 minutos)
+### Exercício 2: Configurar Túnel SSH e RedisInsight (15 minutos)
 
 **Objetivo:** Estabelecer conexão segura entre RedisInsight e ElastiCache
 
-#### Passo 1: Verificar Instalação do RedisInsight
+> **🔐 POR QUE TÚNEL SSH É NECESSÁRIO:**
+> 
+> **Analogia:** ElastiCache é como um "cofre dentro de um banco" (VPC privada). Você não pode acessar diretamente da rua (internet). Precisa de um "funcionário autorizado" (Bastion Host) para te levar até o cofre.
+> 
+> **O túnel SSH funciona como:**
+> - **Bastion Host = Porteiro do banco:** Tem acesso autorizado à VPC
+> - **Túnel SSH = Corredor seguro:** Conecta você ao ElastiCache de forma segura
+> - **RedisInsight = Sua ferramenta:** Usa o túnel para acessar o "cofre"
+> 
+> **Fluxo de conexão:**
+> ```
+> Seu Computador → SSH Tunnel → Bastion Host → VPC → ElastiCache
+>      ↓              ↓            ↓         ↓        ↓
+> RedisInsight → localhost:6380 → EC2 → Private → Redis
+> ```
+> 
+> **Benefícios do túnel:**
+> - ✅ **Segurança:** Tráfego criptografado end-to-end
+> - ✅ **Simplicidade:** RedisInsight "pensa" que Redis está local
+> - ✅ **Flexibilidade:** Funciona de qualquer lugar com SSH
+> - ✅ **Auditoria:** Todo acesso passa pelo Bastion Host
+
+#### Passo 1: Verificar e Instalar RedisInsight
+
+> **📦 INSTALAÇÃO INTELIGENTE DO REDISINSIGHT:**
+> 
+> **Estratégias de instalação:**
+> 1. **Na instância EC2 (Bastion Host):** Mais simples, sem túnel complexo
+> 2. **No seu computador local:** Mais flexível, requer túnel SSH
+> 3. **Via Docker:** Mais portável, funciona em qualquer OS
+> 
+> **Vamos usar a estratégia mais robusta:** Instalação local + túnel SSH
 
 ```bash
 # Verificar se RedisInsight está instalado
+echo "🔍 Verificando instalação do RedisInsight..."
+
 if command -v redisinsight &> /dev/null; then
     echo "✅ RedisInsight já instalado"
     redisinsight --version
 else
-    echo "📦 Instalando RedisInsight..."
+    echo "📦 RedisInsight não encontrado. Instalando..."
     
-    # Download e instalação (Linux)
-    wget https://download.redislabs.com/redisinsight/latest/redisinsight-linux64-latest.tar.gz
-    tar -xzf redisinsight-linux64-latest.tar.gz
-    sudo mv redisinsight-linux64-* /opt/redisinsight
-    sudo ln -sf /opt/redisinsight/redisinsight /usr/local/bin/redisinsight
+    # Detectar sistema operacional
+    OS=$(uname -s)
+    ARCH=$(uname -m)
     
-    echo "✅ RedisInsight instalado"
+    case $OS in
+        "Linux")
+            echo "🐧 Detectado: Linux"
+            # Download para Linux
+            DOWNLOAD_URL="https://download.redislabs.com/redisinsight/latest/redisinsight-linux64-latest.tar.gz"
+            
+            echo "Baixando RedisInsight..."
+            wget -q --show-progress $DOWNLOAD_URL -O /tmp/redisinsight.tar.gz
+            
+            echo "Extraindo..."
+            cd /tmp
+            tar -xzf redisinsight.tar.gz
+            
+            echo "Instalando..."
+            sudo mkdir -p /opt/redisinsight
+            sudo mv redisinsight-linux64-* /opt/redisinsight/
+            sudo ln -sf /opt/redisinsight/redisinsight /usr/local/bin/redisinsight
+            
+            # Tornar executável
+            sudo chmod +x /opt/redisinsight/redisinsight
+            sudo chmod +x /usr/local/bin/redisinsight
+            ;;
+            
+        "Darwin")
+            echo "🍎 Detectado: macOS"
+            echo "Para macOS, recomendamos:"
+            echo "1. Baixar de: https://redis.com/redis-enterprise/redis-insight/"
+            echo "2. Ou usar Homebrew: brew install --cask redisinsight"
+            echo "3. Ou usar Docker: docker run -d -p 8001:8001 redislabs/redisinsight:latest"
+            ;;
+            
+        *)
+            echo "❓ Sistema não reconhecido: $OS"
+            echo "Opções de instalação:"
+            echo "1. Docker: docker run -d -p 8001:8001 redislabs/redisinsight:latest"
+            echo "2. Download manual: https://redis.com/redis-enterprise/redis-insight/"
+            ;;
+    esac
+    
+    # Verificar instalação
+    if command -v redisinsight &> /dev/null; then
+        echo "✅ RedisInsight instalado com sucesso!"
+        redisinsight --version
+    else
+        echo "⚠️ Instalação pode não ter funcionado. Tentando Docker como fallback..."
+        
+        # Fallback: Docker
+        if command -v docker &> /dev/null; then
+            echo "🐳 Usando Docker para RedisInsight..."
+            docker run -d --name redisinsight-$ID -p 8001:8001 redislabs/redisinsight:latest
+            echo "✅ RedisInsight rodando via Docker na porta 8001"
+        else
+            echo "❌ Docker não disponível. Instalação manual necessária."
+            echo "Visite: https://redis.com/redis-enterprise/redis-insight/"
+            exit 1
+        fi
+    fi
 fi
 ```
 
-#### Passo 2: Configurar Túnel SSH
+> **📊 INTERPRETANDO A INSTALAÇÃO:**
+> 
+> **Sucesso esperado:**
+> ```
+> ✅ RedisInsight instalado com sucesso!
+> RedisInsight version 2.x.x
+> ```
+> 
+> **Se houver problemas:**
+> - **Permissões:** Use `sudo` para instalação em `/opt/`
+> - **Dependências:** Instale `wget`, `tar` se necessário
+> - **Firewall:** Libere porta 8001 para acesso web
+> - **Docker fallback:** Sempre funciona se Docker estiver disponível
+
+#### Passo 2: Configurar Túnel SSH Avançado
+
+> **🔧 TÚNEL SSH PROFISSIONAL:**
+> 
+> **Anatomia do comando SSH:**
+> ```bash
+> ssh -f -N -L local_port:target_host:target_port user@bastion_host
+>  │   │  │  │                                    │
+>  │   │  │  └─ Port forwarding                   └─ Bastion connection
+>  │   │  └─ No remote command
+>  │   └─ Fork to background  
+>  └─ SSH command
+> ```
+> 
+> **Parâmetros explicados:**
+> - **-f:** Vai para background após autenticação
+> - **-N:** Não executa comando remoto (só túnel)
+> - **-L:** Local port forwarding
+> - **local_port:** Porta no seu computador (ex: 6380)
+> - **target_host:** Endpoint do ElastiCache
+> - **target_port:** Porta do Redis (6379)
+> 
+> **Fluxo de dados:**
+> ```
+> RedisInsight → localhost:6380 → SSH Tunnel → Bastion → ElastiCache:6379
+> ```
 
 ```bash
-# Obter IP público da instância EC2 (Bastion Host)
-BASTION_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-echo "Bastion Host IP: $BASTION_IP"
+# Configurar túnel SSH avançado
+echo "🔧 Configurando túnel SSH para ElastiCache..."
 
-# Configurar túnel SSH para RedisInsight
-echo "🔧 Configurando túnel SSH..."
+# Obter informações necessárias
+BASTION_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "CONFIGURE_MANUALMENTE")
+BASTION_USER="ec2-user"  # Usuário padrão para Amazon Linux
+LOCAL_PORT=6380          # Porta local para RedisInsight
+REDIS_PORT=6379         # Porta padrão do Redis
 
-# Criar script de túnel
-cat > /tmp/setup_tunnel_$ID.sh << EOF
+echo "📋 Configuração do túnel:"
+echo "Endpoint ElastiCache: $INSIGHT_ENDPOINT"
+echo "Bastion Host: $BASTION_USER@$BASTION_IP"
+echo "Porta local: $LOCAL_PORT"
+echo "Porta Redis: $REDIS_PORT"
+
+# Criar script de túnel robusto
+cat > /tmp/setup_tunnel_$ID.sh << 'EOF'
 #!/bin/bash
 
 # Configuração do túnel SSH para RedisInsight
-ENDPOINT="$INSIGHT_ENDPOINT"
+ENDPOINT="${INSIGHT_ENDPOINT}"
 LOCAL_PORT=6380
-BASTION_USER=\${1:-ec2-user}
-BASTION_IP=\${2:-$BASTION_IP}
+BASTION_USER="${BASTION_USER:-ec2-user}"
+BASTION_IP="${BASTION_IP}"
+SSH_KEY="${SSH_KEY:-~/.ssh/id_rsa}"
 
-echo "🔗 Configurando túnel SSH para RedisInsight..."
-echo "Endpoint ElastiCache: \$ENDPOINT"
-echo "Porta local: \$LOCAL_PORT"
-echo "Bastion Host: \$BASTION_USER@\$BASTION_IP"
+# Função para verificar se túnel está ativo
+check_tunnel() {
+    local port=$1
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+        return 0  # Túnel ativo
+    else
+        return 1  # Túnel inativo
+    fi
+}
 
-# Criar túnel SSH
-ssh -f -N -L \$LOCAL_PORT:\$ENDPOINT:6379 \$BASTION_USER@\$BASTION_IP
+# Função para criar túnel
+create_tunnel() {
+    echo "🔗 Criando túnel SSH..."
+    echo "Comando: ssh -f -N -L $LOCAL_PORT:$ENDPOINT:6379 $BASTION_USER@$BASTION_IP"
+    
+    # Verificar se túnel já existe
+    if check_tunnel $LOCAL_PORT; then
+        echo "⚠️ Túnel já existe na porta $LOCAL_PORT"
+        echo "Para recriar, execute: pkill -f 'ssh.*$ENDPOINT' && $0"
+        return 0
+    fi
+    
+    # Criar túnel SSH
+    if [ -f "$SSH_KEY" ]; then
+        ssh -f -N -L $LOCAL_PORT:$ENDPOINT:6379 -i $SSH_KEY $BASTION_USER@$BASTION_IP
+    else
+        ssh -f -N -L $LOCAL_PORT:$ENDPOINT:6379 $BASTION_USER@$BASTION_IP
+    fi
+    
+    # Verificar se túnel foi criado
+    sleep 2
+    if check_tunnel $LOCAL_PORT; then
+        echo "✅ Túnel SSH criado com sucesso!"
+        echo "RedisInsight pode conectar em: localhost:$LOCAL_PORT"
+        
+        # Testar conectividade
+        echo "🧪 Testando conectividade..."
+        if command -v redis-cli &> /dev/null; then
+            if redis-cli -h localhost -p $LOCAL_PORT ping >/dev/null 2>&1; then
+                echo "✅ Conectividade OK (sem TLS)"
+            elif redis-cli -h localhost -p $LOCAL_PORT --tls ping >/dev/null 2>&1; then
+                echo "✅ Conectividade OK (com TLS)"
+                echo "⚠️ IMPORTANTE: Configure TLS no RedisInsight"
+            else
+                echo "❌ Erro de conectividade - verifique configurações"
+            fi
+        else
+            echo "⚠️ redis-cli não disponível para teste"
+        fi
+        
+        return 0
+    else
+        echo "❌ Erro ao criar túnel SSH"
+        echo "Possíveis causas:"
+        echo "- Chave SSH incorreta"
+        echo "- Security Group não permite SSH"
+        echo "- Bastion Host inacessível"
+        echo "- Endpoint ElastiCache incorreto"
+        return 1
+    fi
+}
 
-if [ \$? -eq 0 ]; then
-    echo "✅ Túnel SSH criado com sucesso!"
-    echo "RedisInsight pode conectar em: localhost:\$LOCAL_PORT"
-    echo ""
-    echo "Para testar a conexão:"
-    echo "redis-cli -h localhost -p \$LOCAL_PORT ping"
-else
-    echo "❌ Erro ao criar túnel SSH"
-    exit 1
-fi
+# Função para monitorar túnel
+monitor_tunnel() {
+    echo "📊 Monitorando túnel SSH..."
+    while true; do
+        if check_tunnel $LOCAL_PORT; then
+            echo "$(date): ✅ Túnel ativo"
+        else
+            echo "$(date): ❌ Túnel inativo - recriando..."
+            create_tunnel
+        fi
+        sleep 30
+    done
+}
+
+# Função para parar túnel
+stop_tunnel() {
+    echo "🛑 Parando túnel SSH..."
+    pkill -f "ssh.*$ENDPOINT"
+    if ! check_tunnel $LOCAL_PORT; then
+        echo "✅ Túnel parado"
+    else
+        echo "⚠️ Túnel ainda ativo - pode precisar de kill manual"
+    fi
+}
+
+# Menu principal
+case "${1:-create}" in
+    "create")
+        create_tunnel
+        ;;
+    "monitor")
+        monitor_tunnel
+        ;;
+    "stop")
+        stop_tunnel
+        ;;
+    "status")
+        if check_tunnel $LOCAL_PORT; then
+            echo "✅ Túnel ativo na porta $LOCAL_PORT"
+        else
+            echo "❌ Túnel inativo"
+        fi
+        ;;
+    *)
+        echo "Uso: $0 {create|monitor|stop|status}"
+        echo "  create  - Criar túnel SSH"
+        echo "  monitor - Monitorar e recriar se necessário"
+        echo "  stop    - Parar túnel SSH"
+        echo "  status  - Verificar status do túnel"
+        ;;
+esac
 EOF
 
+# Substituir variáveis no script
+sed -i "s/\${INSIGHT_ENDPOINT}/$INSIGHT_ENDPOINT/g" /tmp/setup_tunnel_$ID.sh
+sed -i "s/\${BASTION_USER}/$BASTION_USER/g" /tmp/setup_tunnel_$ID.sh
+sed -i "s/\${BASTION_IP}/$BASTION_IP/g" /tmp/setup_tunnel_$ID.sh
+
 chmod +x /tmp/setup_tunnel_$ID.sh
+
 echo "✅ Script de túnel criado: /tmp/setup_tunnel_$ID.sh"
+echo ""
+echo "📖 Como usar o script:"
+echo "  /tmp/setup_tunnel_$ID.sh create   # Criar túnel"
+echo "  /tmp/setup_tunnel_$ID.sh status   # Verificar status"
+echo "  /tmp/setup_tunnel_$ID.sh stop     # Parar túnel"
+echo "  /tmp/setup_tunnel_$ID.sh monitor  # Monitorar continuamente"
+
+# Executar criação do túnel
+echo ""
+echo "🚀 Criando túnel SSH..."
+/tmp/setup_tunnel_$ID.sh create
 ```
 
-#### Passo 3: Iniciar RedisInsight
+> **📊 INTERPRETANDO O TÚNEL SSH:**
+> 
+> **Sucesso esperado:**
+> ```
+> ✅ Túnel SSH criado com sucesso!
+> RedisInsight pode conectar em: localhost:6380
+> ✅ Conectividade OK (sem TLS)
+> ```
+> 
+> **Se houver TLS:**
+> ```
+> ✅ Conectividade OK (com TLS)
+> ⚠️ IMPORTANTE: Configure TLS no RedisInsight
+> ```
+> 
+> **Troubleshooting comum:**
+> - **"Permission denied":** Verifique chave SSH
+> - **"Connection refused":** Verifique Security Group
+> - **"Host unreachable":** Verifique IP do Bastion
+> - **"Port already in use":** Use `pkill -f ssh` para limpar
+
+#### Passo 3: Iniciar RedisInsight com Configuração Otimizada
+
+> **🚀 INICIALIZAÇÃO PROFISSIONAL DO REDISINSIGHT:**
+> 
+> **Estratégias de inicialização:**
+> 1. **Foreground:** Para debugging e desenvolvimento
+> 2. **Background:** Para uso contínuo e produção
+> 3. **Docker:** Para isolamento e portabilidade
+> 4. **Systemd:** Para inicialização automática
+> 
+> **Configurações importantes:**
+> - **Porta:** Evitar conflitos (8001 em vez de 8000)
+> - **Logs:** Capturar para troubleshooting
+> - **PID:** Rastrear processo para gerenciamento
+> - **Health check:** Verificar se iniciou corretamente
 
 ```bash
-# Iniciar RedisInsight em background
+# Iniciar RedisInsight com configuração otimizada
 echo "🚀 Iniciando RedisInsight..."
 
-# Configurar porta para RedisInsight (evitar conflitos)
+# Configurações
 REDISINSIGHT_PORT=8001
+REDISINSIGHT_LOG="/tmp/redisinsight_$ID.log"
+REDISINSIGHT_PID_FILE="/tmp/redisinsight_$ID.pid"
+
+# Função para verificar se RedisInsight está rodando
+check_redisinsight() {
+    local port=$1
+    if curl -s http://localhost:$port/api/health >/dev/null 2>&1; then
+        return 0  # Rodando
+    else
+        return 1  # Não rodando
+    fi
+}
+
+# Parar instância anterior se existir
+if [ -f "$REDISINSIGHT_PID_FILE" ]; then
+    OLD_PID=$(cat $REDISINSIGHT_PID_FILE)
+    if ps -p $OLD_PID > /dev/null 2>&1; then
+        echo "🛑 Parando instância anterior (PID: $OLD_PID)..."
+        kill $OLD_PID
+        sleep 3
+    fi
+    rm -f $REDISINSIGHT_PID_FILE
+fi
+
+# Verificar se porta está livre
+if lsof -Pi :$REDISINSIGHT_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "⚠️ Porta $REDISINSIGHT_PORT já está em uso"
+    echo "Processos usando a porta:"
+    lsof -Pi :$REDISINSIGHT_PORT -sTCP:LISTEN
+    echo ""
+    echo "Para liberar a porta:"
+    echo "sudo lsof -ti:$REDISINSIGHT_PORT | xargs kill -9"
+    
+    # Tentar próxima porta disponível
+    for port in {8002..8010}; do
+        if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+            echo "✅ Usando porta alternativa: $port"
+            REDISINSIGHT_PORT=$port
+            break
+        fi
+    done
+fi
+
+echo "📋 Configuração do RedisInsight:"
+echo "Porta: $REDISINSIGHT_PORT"
+echo "Log: $REDISINSIGHT_LOG"
+echo "PID file: $REDISINSIGHT_PID_FILE"
 
 # Iniciar RedisInsight
-nohup redisinsight --port $REDISINSIGHT_PORT > /tmp/redisinsight_$ID.log 2>&1 &
-REDISINSIGHT_PID=$!
+echo "🔄 Iniciando RedisInsight..."
 
-echo "✅ RedisInsight iniciado na porta $REDISINSIGHT_PORT (PID: $REDISINSIGHT_PID)"
-echo "📱 Acesse via navegador: http://localhost:$REDISINSIGHT_PORT"
-
-# Aguardar RedisInsight inicializar
-sleep 5
-
-# Verificar se está rodando
-if ps -p $REDISINSIGHT_PID > /dev/null; then
-    echo "✅ RedisInsight está rodando"
+# Verificar método de instalação
+if command -v redisinsight &> /dev/null; then
+    # Instalação nativa
+    echo "Usando instalação nativa..."
+    nohup redisinsight --port $REDISINSIGHT_PORT > $REDISINSIGHT_LOG 2>&1 &
+    REDISINSIGHT_PID=$!
+    
+elif docker ps --format "table {{.Names}}" | grep -q "redisinsight-$ID"; then
+    # Docker já rodando
+    echo "✅ RedisInsight já rodando via Docker"
+    REDISINSIGHT_PID=$(docker inspect --format='{{.State.Pid}}' redisinsight-$ID)
+    
 else
-    echo "❌ Problema ao iniciar RedisInsight"
-    echo "Verifique os logs: tail -f /tmp/redisinsight_$ID.log"
+    # Tentar Docker
+    if command -v docker &> /dev/null; then
+        echo "Usando Docker..."
+        docker run -d --name redisinsight-$ID -p $REDISINSIGHT_PORT:8001 redislabs/redisinsight:latest > $REDISINSIGHT_LOG 2>&1
+        REDISINSIGHT_PID=$(docker inspect --format='{{.State.Pid}}' redisinsight-$ID)
+    else
+        echo "❌ Nem instalação nativa nem Docker disponível"
+        exit 1
+    fi
 fi
+
+# Salvar PID
+echo $REDISINSIGHT_PID > $REDISINSIGHT_PID_FILE
+
+echo "✅ RedisInsight iniciado (PID: $REDISINSIGHT_PID)"
+echo "📱 URL de acesso: http://localhost:$REDISINSIGHT_PORT"
+
+# Aguardar inicialização
+echo "⏳ Aguardando RedisInsight inicializar..."
+for i in {1..30}; do
+    if check_redisinsight $REDISINSIGHT_PORT; then
+        echo "✅ RedisInsight está respondendo!"
+        break
+    else
+        echo -n "."
+        sleep 2
+    fi
+    
+    if [ $i -eq 30 ]; then
+        echo ""
+        echo "❌ RedisInsight não respondeu após 60 segundos"
+        echo "Verificar logs: tail -f $REDISINSIGHT_LOG"
+        exit 1
+    fi
+done
+
+# Verificar saúde
+echo ""
+echo "🏥 Verificação de saúde:"
+if ps -p $REDISINSIGHT_PID > /dev/null 2>&1; then
+    echo "✅ Processo ativo (PID: $REDISINSIGHT_PID)"
+else
+    echo "❌ Processo não encontrado"
+fi
+
+if check_redisinsight $REDISINSIGHT_PORT; then
+    echo "✅ API respondendo"
+else
+    echo "❌ API não responde"
+fi
+
+if lsof -Pi :$REDISINSIGHT_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "✅ Porta $REDISINSIGHT_PORT em uso"
+else
+    echo "❌ Porta $REDISINSIGHT_PORT não está sendo usada"
+fi
+
+echo ""
+echo "🎯 RedisInsight está pronto!"
+echo "📱 Acesse: http://localhost:$REDISINSIGHT_PORT"
+echo "📊 Logs: tail -f $REDISINSIGHT_LOG"
+echo "🛑 Para parar: kill $REDISINSIGHT_PID"
 ```
 
-#### Passo 4: Configurar Conexão no RedisInsight
+> **📊 INTERPRETANDO A INICIALIZAÇÃO:**
+> 
+> **Sucesso completo:**
+> ```
+> ✅ RedisInsight iniciado (PID: 12345)
+> ✅ RedisInsight está respondendo!
+> ✅ Processo ativo (PID: 12345)
+> ✅ API respondendo
+> ✅ Porta 8001 em uso
+> 🎯 RedisInsight está pronto!
+> ```
+> 
+> **Problemas comuns:**
+> - **Porta em uso:** Script tenta portas alternativas automaticamente
+> - **Processo não inicia:** Verificar logs em `/tmp/redisinsight_$ID.log`
+> - **API não responde:** Aguardar mais tempo ou verificar firewall
+> - **Docker não disponível:** Instalar Docker ou usar instalação nativa
 
-**Via Interface Web:**
+#### Passo 4: Configurar Conexão no RedisInsight (Passo a Passo Visual)
 
-1. **Abra o navegador** e acesse `http://localhost:8001`
-2. **Primeira configuração:**
-   - Aceite os termos de uso
-   - Pule tutoriais opcionais
-3. **Adicionar Database:**
-   - Clique em "Add Redis Database"
-   - **Connection Type:** Standalone
-   - **Host:** `localhost` (via túnel SSH)
-   - **Port:** `6380` (porta do túnel)
-   - **Database Alias:** `ElastiCache-Lab-$ID`
-   - **Username:** (deixe vazio)
-   - **Password:** (deixe vazio)
-4. **Testar Conexão:**
-   - Clique em "Test Connection"
-   - Deve mostrar "Connection Successful"
-5. **Salvar:**
-   - Clique em "Add Redis Database"
+> **🎨 CONFIGURAÇÃO VISUAL DETALHADA:**
+> 
+> **Analogia:** Agora vamos "ensinar" o RedisInsight onde encontrar nosso Redis. É como configurar GPS - precisamos dar o endereço correto (localhost:6380) para chegar ao destino (ElastiCache).
+> 
+> **Informações necessárias:**
+> - **Host:** `localhost` (através do túnel SSH)
+> - **Port:** `6380` (porta local do túnel)
+> - **TLS:** Depende da configuração do ElastiCache
+> - **Auth:** Geralmente não necessário para labs
+> 
+> **Fluxo de configuração:**
+> 1. **Acessar interface** → 2. **Adicionar database** → 3. **Configurar conexão** → 4. **Testar** → 5. **Salvar**
 
-**✅ Checkpoint:** RedisInsight deve estar conectado ao cluster ElastiCache.
+```bash
+# Preparar informações para configuração visual
+echo "🎨 Preparando configuração do RedisInsight..."
+
+# Detectar se ElastiCache usa TLS
+echo "🔍 Detectando configuração de TLS..."
+TLS_REQUIRED="false"
+if redis-cli -h localhost -p 6380 ping >/dev/null 2>&1; then
+    echo "✅ Conexão sem TLS funcionando"
+    TLS_REQUIRED="false"
+elif redis-cli -h localhost -p 6380 --tls ping >/dev/null 2>&1; then
+    echo "✅ Conexão com TLS funcionando"
+    TLS_REQUIRED="true"
+else
+    echo "❌ Nenhuma conexão funcionando - verificar túnel SSH"
+    TLS_REQUIRED="unknown"
+fi
+
+# Obter informações do cluster
+echo ""
+echo "📋 Informações para configuração do RedisInsight:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🌐 URL do RedisInsight: http://localhost:$REDISINSIGHT_PORT"
+echo "🏠 Host: localhost"
+echo "🔌 Port: 6380"
+echo "🔐 TLS Required: $TLS_REQUIRED"
+echo "👤 Username: (deixar vazio)"
+echo "🔑 Password: (deixar vazio)"
+echo "🏷️ Database Alias: ElastiCache-Lab-$ID"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Criar arquivo de configuração de exemplo
+cat > /tmp/redisinsight_config_$ID.json << EOF
+{
+  "host": "localhost",
+  "port": 6380,
+  "name": "ElastiCache-Lab-$ID",
+  "tls": $TLS_REQUIRED,
+  "username": "",
+  "password": "",
+  "timeout": 30000
+}
+EOF
+
+echo ""
+echo "📄 Configuração salva em: /tmp/redisinsight_config_$ID.json"
+
+# Instruções passo a passo
+echo ""
+echo "🎯 INSTRUÇÕES PASSO A PASSO:"
+echo ""
+echo "1️⃣ ACESSAR REDISINSIGHT:"
+echo "   • Abra navegador em: http://localhost:$REDISINSIGHT_PORT"
+echo "   • Aguarde carregar completamente"
+echo ""
+echo "2️⃣ PRIMEIRA CONFIGURAÇÃO (se for primeira vez):"
+echo "   • Aceite os termos de uso"
+echo "   • Pule tutoriais opcionais (ou faça se quiser)"
+echo "   • Chegue na tela principal"
+echo ""
+echo "3️⃣ ADICIONAR DATABASE:"
+echo "   • Clique em 'Add Redis Database' ou '+'"
+echo "   • Selecione 'Connect to a Redis Database'"
+echo ""
+echo "4️⃣ CONFIGURAR CONEXÃO:"
+echo "   • Connection Type: 'Standalone'"
+echo "   • Host: 'localhost'"
+echo "   • Port: '6380'"
+echo "   • Database Alias: 'ElastiCache-Lab-$ID'"
+echo "   • Username: (deixar vazio)"
+echo "   • Password: (deixar vazio)"
+
+if [ "$TLS_REQUIRED" = "true" ]; then
+    echo "   • ⚠️ IMPORTANTE: Marcar 'Use TLS'"
+    echo "   • TLS Settings: Use default settings"
+fi
+
+echo ""
+echo "5️⃣ TESTAR CONEXÃO:"
+echo "   • Clique em 'Test Connection'"
+echo "   • Deve mostrar 'Connection Successful'"
+echo "   • Se falhar, verificar túnel SSH"
+echo ""
+echo "6️⃣ SALVAR:"
+echo "   • Clique em 'Add Redis Database'"
+echo "   • Deve aparecer na lista de databases"
+echo ""
+echo "7️⃣ CONECTAR:"
+echo "   • Clique no database criado"
+echo "   • Deve abrir o dashboard principal"
+echo ""
+
+# Verificações automáticas
+echo "🔧 VERIFICAÇÕES AUTOMÁTICAS:"
+echo ""
+
+# Verificar túnel SSH
+if lsof -Pi :6380 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "✅ Túnel SSH ativo na porta 6380"
+else
+    echo "❌ Túnel SSH não ativo - execute: /tmp/setup_tunnel_$ID.sh create"
+fi
+
+# Verificar RedisInsight
+if check_redisinsight $REDISINSIGHT_PORT; then
+    echo "✅ RedisInsight respondendo na porta $REDISINSIGHT_PORT"
+else
+    echo "❌ RedisInsight não responde - verificar logs: tail -f $REDISINSIGHT_LOG"
+fi
+
+# Verificar conectividade Redis
+if [ "$TLS_REQUIRED" = "true" ]; then
+    if redis-cli -h localhost -p 6380 --tls ping >/dev/null 2>&1; then
+        echo "✅ Redis acessível via TLS"
+    else
+        echo "❌ Redis não acessível via TLS"
+    fi
+elif [ "$TLS_REQUIRED" = "false" ]; then
+    if redis-cli -h localhost -p 6380 ping >/dev/null 2>&1; then
+        echo "✅ Redis acessível sem TLS"
+    else
+        echo "❌ Redis não acessível sem TLS"
+    fi
+else
+    echo "⚠️ Conectividade Redis não determinada"
+fi
+
+echo ""
+echo "🆘 TROUBLESHOOTING:"
+echo "• Túnel SSH inativo: /tmp/setup_tunnel_$ID.sh create"
+echo "• RedisInsight não responde: tail -f $REDISINSIGHT_LOG"
+echo "• Erro de TLS: Marcar/desmarcar 'Use TLS' no RedisInsight"
+echo "• Connection timeout: Verificar Security Groups"
+echo "• Port already in use: pkill -f redisinsight && reiniciar"
+```
+
+> **📊 INTERPRETANDO A CONFIGURAÇÃO:**
+> 
+> **Configuração bem-sucedida:**
+> ```
+> ✅ Túnel SSH ativo na porta 6380
+> ✅ RedisInsight respondendo na porta 8001
+> ✅ Redis acessível sem TLS
+> ```
+> 
+> **No RedisInsight você deve ver:**
+> - **Test Connection:** "Connection Successful" ✅
+> - **Database List:** "ElastiCache-Lab-aluno01" aparece
+> - **Dashboard:** Métricas e informações do cluster
+> 
+> **Problemas comuns e soluções:**
+> - **"Connection failed":** Verificar túnel SSH
+> - **"Timeout":** Verificar Security Groups
+> - **"TLS error":** Ajustar configuração TLS
+> - **"Host unreachable":** Verificar endpoint do ElastiCache
+
+**✅ Checkpoint:** RedisInsight deve estar conectado e mostrando dados do cluster ElastiCache.
 
 ---
 
