@@ -51,9 +51,24 @@ if ! command -v aws &> /dev/null; then
     exit 1
 fi
 
+# Configurar perfil AWS (opcional)
+AWS_PROFILE=""
+if [ "$1" == "--profile" ] && [ ! -z "$2" ]; then
+    AWS_PROFILE="$2"
+    log "Usando perfil AWS: $AWS_PROFILE"
+    export AWS_PROFILE
+    shift 2
+fi
+
 # Verificar credenciais AWS
 if ! aws sts get-caller-identity &> /dev/null; then
-    error "Credenciais AWS não configuradas. Execute: aws configure"
+    error "Credenciais AWS não configuradas."
+    if [ -z "$AWS_PROFILE" ]; then
+        error "Execute: aws configure"
+        error "Ou use: $0 --profile SEU_PERFIL"
+    else
+        error "Perfil '$AWS_PROFILE' não encontrado ou sem credenciais válidas"
+    fi
     exit 1
 fi
 
@@ -67,6 +82,9 @@ USER_ARN=$(aws sts get-caller-identity --query Arn --output text)
 log "Conta AWS: $ACCOUNT_ID"
 log "Região: $REGION"
 log "Usuário: $USER_ARN"
+if [ ! -z "$AWS_PROFILE" ]; then
+    log "Perfil: $AWS_PROFILE"
+fi
 
 # Parâmetros do curso
 echo ""
@@ -410,21 +428,65 @@ log "  KeyPairName: $KEY_NAME"
 log "  ConsolePasswordSecret: $SECRET_NAME"
 log "  LabsBucketName: $LABS_BUCKET"
 
-aws cloudformation $ACTION \
-    --stack-name "$STACK_NAME" \
-    --template-body file://setup-curso-elasticache-dynamic.yaml \
-    --parameters \
-        ParameterKey=NumeroAlunos,ParameterValue="$NUM_ALUNOS" \
-        ParameterKey=PrefixoAluno,ParameterValue="$PREFIXO_ALUNO" \
-        ParameterKey=AllowedCIDR,ParameterValue="$ALLOWED_CIDR" \
-        ParameterKey=KeyPairName,ParameterValue="$KEY_NAME" \
-        ParameterKey=ConsolePasswordSecret,ParameterValue="$SECRET_NAME" \
-        ParameterKey=LabsBucketName,ParameterValue="$LABS_BUCKET" \
-    --capabilities CAPABILITY_NAMED_IAM \
-    --tags \
-        Key=Purpose,Value="Curso ElastiCache" \
-        Key=Environment,Value="Lab" \
-        Key=CreatedBy,Value="$(whoami)"
+# Verificar tamanho do template
+TEMPLATE_FILE="setup-curso-elasticache-dynamic.yaml"
+TEMPLATE_SIZE=$(wc -c < "$TEMPLATE_FILE")
+MAX_TEMPLATE_SIZE=51200  # 50KB - limite do CloudFormation para template-body
+
+log "Tamanho do template: $TEMPLATE_SIZE bytes"
+
+# Se o template for maior que 50KB, fazer upload para S3
+if [ $TEMPLATE_SIZE -gt $MAX_TEMPLATE_SIZE ]; then
+    warning "Template muito grande ($TEMPLATE_SIZE bytes). Fazendo upload para S3..."
+    
+    # Upload do template para S3
+    TEMPLATE_S3_KEY="templates/$(date +%Y%m%d-%H%M%S)/${TEMPLATE_FILE}"
+    aws s3 cp "$TEMPLATE_FILE" "s3://${LABS_BUCKET}/${TEMPLATE_S3_KEY}"
+    
+    if [ $? -eq 0 ]; then
+        success "Template enviado para S3: s3://${LABS_BUCKET}/${TEMPLATE_S3_KEY}"
+        TEMPLATE_URL="https://${LABS_BUCKET}.s3.${REGION}.amazonaws.com/${TEMPLATE_S3_KEY}"
+        
+        # Usar template-url em vez de template-body
+        aws cloudformation $ACTION \
+            --stack-name "$STACK_NAME" \
+            --template-url "$TEMPLATE_URL" \
+            --parameters \
+                ParameterKey=NumeroAlunos,ParameterValue="$NUM_ALUNOS" \
+                ParameterKey=PrefixoAluno,ParameterValue="$PREFIXO_ALUNO" \
+                ParameterKey=AllowedCIDR,ParameterValue="$ALLOWED_CIDR" \
+                ParameterKey=KeyPairName,ParameterValue="$KEY_NAME" \
+                ParameterKey=ConsolePasswordSecret,ParameterValue="$SECRET_NAME" \
+                ParameterKey=LabsBucketName,ParameterValue="$LABS_BUCKET" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --tags \
+                Key=Purpose,Value="Curso ElastiCache" \
+                Key=Environment,Value="Lab" \
+                Key=CreatedBy,Value="$(whoami)"
+    else
+        error "Falha ao enviar template para S3"
+        exit 1
+    fi
+else
+    log "Template dentro do limite. Usando template-body..."
+    
+    # Usar template-body diretamente
+    aws cloudformation $ACTION \
+        --stack-name "$STACK_NAME" \
+        --template-body file://$TEMPLATE_FILE \
+        --parameters \
+            ParameterKey=NumeroAlunos,ParameterValue="$NUM_ALUNOS" \
+            ParameterKey=PrefixoAluno,ParameterValue="$PREFIXO_ALUNO" \
+            ParameterKey=AllowedCIDR,ParameterValue="$ALLOWED_CIDR" \
+            ParameterKey=KeyPairName,ParameterValue="$KEY_NAME" \
+            ParameterKey=ConsolePasswordSecret,ParameterValue="$SECRET_NAME" \
+            ParameterKey=LabsBucketName,ParameterValue="$LABS_BUCKET" \
+        --capabilities CAPABILITY_NAMED_IAM \
+        --tags \
+            Key=Purpose,Value="Curso ElastiCache" \
+            Key=Environment,Value="Lab" \
+            Key=CreatedBy,Value="$(whoami)"
+fi
 
 if [ $? -eq 0 ]; then
     success "Stack deployment iniciado com sucesso!"
