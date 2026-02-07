@@ -375,79 +375,6 @@ echo "✅ Dados interessantes inseridos para exploração no RedisInsight"
 - Deve abrir o dashboard principal
 - Você verá dados do cluster ElastiCache
 
-**🆘 TROUBLESHOOTING COMUM:**
-
-**❌ 'SSH Connection failed':**
-1. Verificar IP do Bastion Host (obter do instrutor)
-2. Verificar caminho da chave SSH
-3. Verificar permissões da chave: chmod 600 ~/.ssh/sua-chave.pem
-4. Verificar se Security Group permite SSH (porta 22)
-
-**❌ 'Redis Connection failed' (após SSH OK):**
-1. Verificar endpoint do ElastiCache
-2. Verificar se Bastion Host tem acesso ao ElastiCache
-3. Verificar Security Groups do ElastiCache
-
-**❌ 'TLS connection error':**
-1. Primeiro tente SEM marcar 'Use TLS'
-2. Se falhar, tente COM 'Use TLS' marcado
-3. ElastiCache pode ter criptografia habilitada
-
-**❌ 'Permission denied (publickey)':**
-1. Verificar se chave SSH está correta
-2. Verificar se usuário é 'ec2-user'
-3. Testar SSH manual: ssh -i ~/.ssh/sua-chave.pem ec2-user@[BASTION_IP]
-
-**❌ 'Connection timeout':**
-1. Verificar conectividade de rede
-2. Verificar se Bastion Host está rodando
-3. Aumentar SSH Timeout no RedisInsight
-
-**🛠️ COMANDOS ÚTEIS PARA TROUBLESHOOTING:**
-
-```bash
-# Testar SSH manual ao Bastion Host:
-ssh -i ~/.ssh/curso-elasticache-key.pem ec2-user@[BASTION_IP]
-
-# Testar conectividade do Bastion ao ElastiCache:
-# (executar no Bastion Host após SSH)
-redis-cli -h [ENDPOINT_ELASTICACHE] -p 6379 --tls ping
-
-# Verificar permissões da chave SSH:
-ls -la ~/.ssh/curso-elasticache-key.pem
-
-# Corrigir permissões da chave SSH:
-chmod 600 ~/.ssh/curso-elasticache-key.pem
-```
-
-> **📊 INTERPRETANDO A CONFIGURAÇÃO SSH TUNNEL INTEGRADO:**
-> 
-> **Configuração bem-sucedida no RedisInsight:**
-> ```
-> SSH Connection: "Connected" ✅
-> Redis Connection: "Connected" ✅
-> Test Connection: "Connection Successful" ✅
-> Database List: "ElastiCache-Lab-aluno01" aparece
-> Dashboard: Métricas e informações do cluster visíveis
-> ```
-> 
-> **Sinais de sucesso:**
-> - **SSH tunnel estabelecido:** RedisInsight mostra "SSH Connected"
-> - **Dashboard carrega:** Mostra informações do Redis
-> - **Browser funciona:** Lista chaves do cluster
-> - **Métricas aparecem:** CPU, memória, conexões
-> - **Comandos executam:** Workbench responde
-> - **Reconexão automática:** Se SSH cair, RedisInsight reconecta
-> 
-> **Vantagens do SSH tunnel integrado:**
-> - ✅ **Gerenciamento automático:** RedisInsight cuida do túnel
-> - ✅ **Interface visual:** Configuração e status visíveis
-> - ✅ **Reconexão automática:** Mais robusto que scripts externos
-> - ✅ **Troubleshooting integrado:** Erros mostrados na interface
-> - ✅ **Menos complexidade:** Não precisa gerenciar scripts separados
-
-**✅ Checkpoint:** RedisInsight deve estar conectado e mostrando dados do cluster ElastiCache através do SSH tunnel integrado.
-
 ---
 ### Exercício 3: Explorar Interface Visual do RedisInsight (10 minutos)
 
@@ -504,12 +431,12 @@ chmod 600 ~/.ssh/curso-elasticache-key.pem
 2. **Gerar Atividade:**
    ```bash
    # Em outro terminal, gere atividade
-   redis-cli -h [ENDPOINT] -p 6379 --tls GET "product:[ID]:1001"
-   redis-cli -h [ENDPOINT] -p 6379 --tls HGETALL "user:[ID]:2001"
-   redis-cli -h [ENDPOINT] -p 6379 --tls LRANGE "cart:[ID]:2001" 0 -1
-   redis-cli -h [ENDPOINT] -p 6379 --tls SMEMBERS "category:[ID]:electronics"
-   redis-cli -h [ENDPOINT] -p 6379 --tls ZRANGE "ranking:[ID]:bestsellers" 0 -1 WITHSCORES
-   redis-cli -h [ENDPOINT] -p 6379 --tls INCR "counter:[ID]:page_views"
+   redis-cli -h $INSIGHT_ENDPOINT -p 6379 --tls GET "product:$ID:1001"
+   redis-cli -h $INSIGHT_ENDPOINT -p 6379 --tls HGETALL "user:$ID:2001"
+   redis-cli -h $INSIGHT_ENDPOINT -p 6379 --tls LRANGE "cart:$ID:2001" 0 -1
+   redis-cli -h $INSIGHT_ENDPOINT -p 6379 --tls SMEMBERS "category:$ID:electronics"
+   redis-cli -h $INSIGHT_ENDPOINT -p 6379 --tls ZRANGE "ranking:$ID:bestsellers" 0 -1 WITHSCORES
+   redis-cli -h $INSIGHT_ENDPOINT -p 6379 --tls INCR "counter:$ID:page_views"
    ```
 
 3. **Analisar Profiler:**
@@ -592,39 +519,6 @@ chmod 600 ~/.ssh/curso-elasticache-key.pem
 - Operações em lote
 - Backup e restore
 
-## 📊 Correlação com CloudWatch
-
-### Integração de Métricas
-
-**No RedisInsight, correlacione com CloudWatch:**
-
-1. **CPU Utilization:**
-   - Compare com atividade no Profiler
-   - Identifique comandos que causam picos
-
-2. **Memory Usage:**
-   - Use Analysis para identificar big keys
-   - Correlacione com DatabaseMemoryUsagePercentage
-
-3. **Network Traffic:**
-   - Monitore comandos que transferem muitos dados
-   - Analise padrões de NetworkBytesIn/Out
-
-### Comandos para Correlação
-
-```bash
-# Obter métricas CloudWatch enquanto usa RedisInsight
-aws cloudwatch get-metric-statistics \
-    --namespace AWS/ElastiCache \
-    --metric-name CPUUtilization \
-    --dimensions Name=CacheClusterId,Value=lab-insight-$ID-001 \
-    --start-time $(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%S) \
-    --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
-    --period 300 \
-    --statistics Average \
-    --region us-east-2
-```
-
 ## 💰 Atenção aos Custos
 
 ⚠️ **IMPORTANTE:** Este laboratório cria recursos AWS que geram custos na região us-east-2:
@@ -648,9 +542,6 @@ aws cloudwatch get-metric-statistics \
 ```bash
 # Deletar replication group
 aws elasticache delete-replication-group --replication-group-id lab-insight-$ID --region us-east-2
-
-# Limpar arquivos temporários (se existirem)
-rm -f /tmp/redisinsight_ssh_info_$ID.txt
 ```
 
 **NOTA:** 
