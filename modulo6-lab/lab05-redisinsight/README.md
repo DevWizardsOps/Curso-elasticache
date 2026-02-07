@@ -448,16 +448,40 @@ echo "Bastion Host: $BASTION_USER@$BASTION_IP"
 echo "Porta local: $LOCAL_PORT"
 echo "Porta Redis: $REDIS_PORT"
 
-# Criar script de túnel robusto
+# Criar script de túnel robusto e interativo
 cat > /tmp/setup_tunnel_$ID.sh << 'EOF'
 #!/bin/bash
 
-# Configuração do túnel SSH para RedisInsight
-ENDPOINT="${INSIGHT_ENDPOINT}"
-LOCAL_PORT=6380
-BASTION_USER="${BASTION_USER:-ec2-user}"
-BASTION_IP="${BASTION_IP}"
-SSH_KEY="${SSH_KEY:-~/.ssh/id_rsa}"
+# Script de Túnel SSH para RedisInsight
+# Versão interativa que solicita configurações do usuário
+
+# Cores para output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Função para imprimir com cores
+print_info() { echo -e "${BLUE}ℹ️  $1${NC}"; }
+print_success() { echo -e "${GREEN}✅ $1${NC}"; }
+print_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
+print_error() { echo -e "${RED}❌ $1${NC}"; }
+
+# Função para solicitar input com valor padrão
+ask_input() {
+    local prompt="$1"
+    local default="$2"
+    local var_name="$3"
+    
+    if [ -n "$default" ]; then
+        read -p "$prompt [$default]: " input
+        eval "$var_name=\"\${input:-$default}\""
+    else
+        read -p "$prompt: " input
+        eval "$var_name=\"$input\""
+    fi
+}
 
 # Função para verificar se túnel está ativo
 check_tunnel() {
@@ -469,66 +493,172 @@ check_tunnel() {
     fi
 }
 
+# Função para configurar túnel interativamente
+configure_tunnel() {
+    print_info "=== Configuração do Túnel SSH para RedisInsight ==="
+    echo ""
+    
+    # Valores padrão (podem ser sobrescritos)
+    DEFAULT_LOCAL_PORT="6380"
+    DEFAULT_REDIS_PORT="6379"
+    DEFAULT_BASTION_USER="ec2-user"
+    DEFAULT_SSH_KEY="~/.ssh/id_rsa"
+    
+    # Solicitar configurações
+    ask_input "Porta local para RedisInsight" "$DEFAULT_LOCAL_PORT" "LOCAL_PORT"
+    ask_input "Endpoint do ElastiCache" "" "ENDPOINT"
+    ask_input "IP/hostname do Bastion Host" "" "BASTION_IP"
+    ask_input "Usuário do Bastion Host" "$DEFAULT_BASTION_USER" "BASTION_USER"
+    ask_input "Caminho da chave SSH" "$DEFAULT_SSH_KEY" "SSH_KEY"
+    ask_input "Porta do Redis no ElastiCache" "$DEFAULT_REDIS_PORT" "REDIS_PORT"
+    
+    # Expandir ~ no caminho da chave SSH
+    SSH_KEY="${SSH_KEY/#\~/$HOME}"
+    
+    echo ""
+    print_info "=== Configuração Confirmada ==="
+    echo "Porta local: $LOCAL_PORT"
+    echo "Endpoint ElastiCache: $ENDPOINT"
+    echo "Bastion Host: $BASTION_USER@$BASTION_IP"
+    echo "Chave SSH: $SSH_KEY"
+    echo "Porta Redis: $REDIS_PORT"
+    echo ""
+    
+    # Confirmar configuração
+    read -p "Confirma a configuração? (y/N): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        print_warning "Configuração cancelada pelo usuário"
+        return 1
+    fi
+    
+    # Salvar configuração para reutilização
+    cat > ~/.ssh_tunnel_config << EOF
+LOCAL_PORT=$LOCAL_PORT
+ENDPOINT=$ENDPOINT
+BASTION_IP=$BASTION_IP
+BASTION_USER=$BASTION_USER
+SSH_KEY=$SSH_KEY
+REDIS_PORT=$REDIS_PORT
+EOF
+    
+    print_success "Configuração salva em ~/.ssh_tunnel_config"
+    return 0
+}
+
+# Função para carregar configuração salva
+load_config() {
+    if [ -f ~/.ssh_tunnel_config ]; then
+        source ~/.ssh_tunnel_config
+        print_info "Configuração carregada de ~/.ssh_tunnel_config"
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Função para validar configuração
+validate_config() {
+    local errors=0
+    
+    # Verificar se variáveis estão definidas
+    if [ -z "$LOCAL_PORT" ] || [ -z "$ENDPOINT" ] || [ -z "$BASTION_IP" ] || [ -z "$BASTION_USER" ] || [ -z "$SSH_KEY" ]; then
+        print_error "Configuração incompleta. Execute 'configure' primeiro."
+        return 1
+    fi
+    
+    # Verificar se chave SSH existe
+    if [ ! -f "$SSH_KEY" ]; then
+        print_error "Chave SSH não encontrada: $SSH_KEY"
+        errors=$((errors + 1))
+    fi
+    
+    # Verificar se porta local está disponível (apenas se não for para criar túnel)
+    if [ "$1" != "create" ] && check_tunnel $LOCAL_PORT; then
+        print_warning "Porta $LOCAL_PORT já está em uso"
+    fi
+    
+    # Verificar se ssh está disponível
+    if ! command -v ssh &> /dev/null; then
+        print_error "Comando 'ssh' não encontrado"
+        errors=$((errors + 1))
+    fi
+    
+    # Verificar se lsof está disponível
+    if ! command -v lsof &> /dev/null; then
+        print_warning "Comando 'lsof' não encontrado - verificação de porta limitada"
+    fi
+    
+    return $errors
+}
+
 # Função para criar túnel
 create_tunnel() {
-    echo "🔗 Criando túnel SSH..."
-    echo "Comando: ssh -f -N -L $LOCAL_PORT:$ENDPOINT:6379 $BASTION_USER@$BASTION_IP"
+    print_info "=== Criando Túnel SSH ==="
     
     # Verificar se túnel já existe
     if check_tunnel $LOCAL_PORT; then
-        echo "⚠️ Túnel já existe na porta $LOCAL_PORT"
-        echo "Para recriar, execute: pkill -f 'ssh.*$ENDPOINT' && $0"
-        return 0
+        print_warning "Túnel já existe na porta $LOCAL_PORT"
+        read -p "Deseja recriar o túnel? (y/N): " recreate
+        if [[ "$recreate" =~ ^[Yy]$ ]]; then
+            stop_tunnel
+            sleep 2
+        else
+            print_info "Mantendo túnel existente"
+            return 0
+        fi
     fi
+    
+    print_info "Criando túnel SSH..."
+    print_info "Comando: ssh -f -N -L $LOCAL_PORT:$ENDPOINT:$REDIS_PORT -i $SSH_KEY $BASTION_USER@$BASTION_IP"
     
     # Criar túnel SSH
-    if [ -f "$SSH_KEY" ]; then
-        ssh -f -N -L $LOCAL_PORT:$ENDPOINT:6379 -i $SSH_KEY $BASTION_USER@$BASTION_IP
-    else
-        ssh -f -N -L $LOCAL_PORT:$ENDPOINT:6379 $BASTION_USER@$BASTION_IP
-    fi
+    ssh -f -N -L $LOCAL_PORT:$ENDPOINT:$REDIS_PORT -i $SSH_KEY $BASTION_USER@$BASTION_IP
     
     # Verificar se túnel foi criado
-    sleep 2
+    sleep 3
     if check_tunnel $LOCAL_PORT; then
-        echo "✅ Túnel SSH criado com sucesso!"
-        echo "RedisInsight pode conectar em: localhost:$LOCAL_PORT"
+        print_success "Túnel SSH criado com sucesso!"
+        print_success "RedisInsight pode conectar em: localhost:$LOCAL_PORT"
         
-        # Testar conectividade
-        echo "🧪 Testando conectividade..."
-        if command -v redis-cli &> /dev/null; then
-            if redis-cli -h localhost -p $LOCAL_PORT ping >/dev/null 2>&1; then
-                echo "✅ Conectividade OK (sem TLS)"
-            elif redis-cli -h localhost -p $LOCAL_PORT --tls ping >/dev/null 2>&1; then
-                echo "✅ Conectividade OK (com TLS)"
-                echo "⚠️ IMPORTANTE: Configure TLS no RedisInsight"
-            else
-                echo "❌ Erro de conectividade - verifique configurações"
-            fi
-        else
-            echo "⚠️ redis-cli não disponível para teste"
-        fi
+        # Mostrar informações de conexão
+        echo ""
+        print_info "=== Informações para RedisInsight ==="
+        echo "Host: localhost"
+        echo "Port: $LOCAL_PORT"
+        echo "Database Alias: ElastiCache-Tunnel"
+        echo ""
+        print_info "=== Gerenciamento do Túnel ==="
+        echo "Status: $0 status"
+        echo "Parar: $0 stop"
+        echo "Monitor: $0 monitor"
         
         return 0
     else
-        echo "❌ Erro ao criar túnel SSH"
-        echo "Possíveis causas:"
-        echo "- Chave SSH incorreta"
-        echo "- Security Group não permite SSH"
-        echo "- Bastion Host inacessível"
-        echo "- Endpoint ElastiCache incorreto"
+        print_error "Erro ao criar túnel SSH"
+        print_error "Possíveis causas:"
+        echo "  • Chave SSH incorreta ou sem permissões"
+        echo "  • Bastion Host inacessível"
+        echo "  • Security Group não permite SSH (porta 22)"
+        echo "  • Endpoint ElastiCache incorreto"
+        echo "  • Porta local já em uso por outro processo"
+        echo ""
+        print_info "Para debug, tente conectar manualmente:"
+        echo "ssh -i $SSH_KEY $BASTION_USER@$BASTION_IP"
         return 1
     fi
 }
 
 # Função para monitorar túnel
 monitor_tunnel() {
-    echo "📊 Monitorando túnel SSH..."
+    print_info "=== Monitorando Túnel SSH ==="
+    print_info "Pressione Ctrl+C para parar o monitoramento"
+    echo ""
+    
     while true; do
         if check_tunnel $LOCAL_PORT; then
-            echo "$(date): ✅ Túnel ativo"
+            print_success "$(date '+%H:%M:%S'): Túnel ativo na porta $LOCAL_PORT"
         else
-            echo "$(date): ❌ Túnel inativo - recriando..."
+            print_error "$(date '+%H:%M:%S'): Túnel inativo - tentando recriar..."
             create_tunnel
         fi
         sleep 30
@@ -537,62 +667,143 @@ monitor_tunnel() {
 
 # Função para parar túnel
 stop_tunnel() {
-    echo "🛑 Parando túnel SSH..."
-    pkill -f "ssh.*$ENDPOINT"
+    print_info "=== Parando Túnel SSH ==="
+    
+    # Encontrar e matar processos SSH relacionados ao endpoint
+    if [ -n "$ENDPOINT" ]; then
+        pkill -f "ssh.*$ENDPOINT" 2>/dev/null
+    fi
+    
+    # Matar processos usando a porta local
+    if command -v lsof &> /dev/null; then
+        local pids=$(lsof -ti:$LOCAL_PORT 2>/dev/null)
+        if [ -n "$pids" ]; then
+            echo $pids | xargs kill 2>/dev/null
+        fi
+    fi
+    
+    sleep 2
+    
     if ! check_tunnel $LOCAL_PORT; then
-        echo "✅ Túnel parado"
+        print_success "Túnel parado com sucesso"
     else
-        echo "⚠️ Túnel ainda ativo - pode precisar de kill manual"
+        print_warning "Túnel ainda pode estar ativo - verificar manualmente"
+        if command -v lsof &> /dev/null; then
+            print_info "Processos usando porta $LOCAL_PORT:"
+            lsof -Pi :$LOCAL_PORT -sTCP:LISTEN 2>/dev/null || echo "Nenhum processo encontrado"
+        fi
     fi
 }
 
+# Função para verificar status
+check_status() {
+    print_info "=== Status do Túnel SSH ==="
+    
+    if [ -f ~/.ssh_tunnel_config ]; then
+        print_success "Configuração encontrada"
+        load_config
+        echo "Porta local: $LOCAL_PORT"
+        echo "Endpoint: $ENDPOINT"
+        echo "Bastion: $BASTION_USER@$BASTION_IP"
+    else
+        print_warning "Configuração não encontrada"
+        return 1
+    fi
+    
+    if check_tunnel $LOCAL_PORT; then
+        print_success "Túnel ativo na porta $LOCAL_PORT"
+        
+        if command -v lsof &> /dev/null; then
+            print_info "Detalhes da conexão:"
+            lsof -Pi :$LOCAL_PORT -sTCP:LISTEN 2>/dev/null
+        fi
+    else
+        print_error "Túnel inativo"
+    fi
+}
+
+# Função para mostrar ajuda
+show_help() {
+    echo "Túnel SSH para RedisInsight - Gerenciador de Conexão"
+    echo ""
+    echo "Uso: $0 {configure|create|status|stop|monitor|help}"
+    echo ""
+    echo "Comandos:"
+    echo "  configure  - Configurar parâmetros do túnel interativamente"
+    echo "  create     - Criar túnel SSH (usa configuração salva)"
+    echo "  status     - Verificar status do túnel"
+    echo "  stop       - Parar túnel SSH"
+    echo "  monitor    - Monitorar túnel e recriar se necessário"
+    echo "  help       - Mostrar esta ajuda"
+    echo ""
+    echo "Fluxo recomendado:"
+    echo "  1. $0 configure    # Primeira vez"
+    echo "  2. $0 create       # Criar túnel"
+    echo "  3. $0 status       # Verificar se está funcionando"
+    echo ""
+    echo "Configuração salva em: ~/.ssh_tunnel_config"
+}
+
 # Menu principal
-case "${1:-create}" in
+case "${1:-help}" in
+    "configure")
+        configure_tunnel
+        ;;
     "create")
-        create_tunnel
-        ;;
-    "monitor")
-        monitor_tunnel
-        ;;
-    "stop")
-        stop_tunnel
-        ;;
-    "status")
-        if check_tunnel $LOCAL_PORT; then
-            echo "✅ Túnel ativo na porta $LOCAL_PORT"
+        if load_config && validate_config create; then
+            create_tunnel
         else
-            echo "❌ Túnel inativo"
+            print_error "Execute '$0 configure' primeiro"
+            exit 1
         fi
         ;;
+    "monitor")
+        if load_config && validate_config; then
+            monitor_tunnel
+        else
+            print_error "Execute '$0 configure' primeiro"
+            exit 1
+        fi
+        ;;
+    "stop")
+        if load_config; then
+            stop_tunnel
+        else
+            print_warning "Configuração não encontrada, tentando parar todos os túneis SSH"
+            pkill -f "ssh.*-L.*:6379" 2>/dev/null
+            print_info "Comando executado"
+        fi
+        ;;
+    "status")
+        check_status
+        ;;
+    "help"|"--help"|"-h")
+        show_help
+        ;;
     *)
-        echo "Uso: $0 {create|monitor|stop|status}"
-        echo "  create  - Criar túnel SSH"
-        echo "  monitor - Monitorar e recriar se necessário"
-        echo "  stop    - Parar túnel SSH"
-        echo "  status  - Verificar status do túnel"
+        print_error "Comando inválido: $1"
+        show_help
+        exit 1
         ;;
 esac
 EOF
 
-# Substituir variáveis no script
-sed -i "s/\${INSIGHT_ENDPOINT}/$INSIGHT_ENDPOINT/g" /tmp/setup_tunnel_$ID.sh
-sed -i "s/\${BASTION_USER}/$BASTION_USER/g" /tmp/setup_tunnel_$ID.sh
-sed -i "s/\${BASTION_IP}/$BASTION_IP/g" /tmp/setup_tunnel_$ID.sh
-
 chmod +x /tmp/setup_tunnel_$ID.sh
 
-echo "✅ Script de túnel criado: /tmp/setup_tunnel_$ID.sh"
+echo "✅ Script de túnel interativo criado: /tmp/setup_tunnel_$ID.sh"
 echo ""
 echo "📖 Como usar o script:"
-echo "  /tmp/setup_tunnel_$ID.sh create   # Criar túnel"
-echo "  /tmp/setup_tunnel_$ID.sh status   # Verificar status"
-echo "  /tmp/setup_tunnel_$ID.sh stop     # Parar túnel"
-echo "  /tmp/setup_tunnel_$ID.sh monitor  # Monitorar continuamente"
+echo "  /tmp/setup_tunnel_$ID.sh configure  # Configurar parâmetros (primeira vez)"
+echo "  /tmp/setup_tunnel_$ID.sh create     # Criar túnel"
+echo "  /tmp/setup_tunnel_$ID.sh status     # Verificar status"
+echo "  /tmp/setup_tunnel_$ID.sh stop       # Parar túnel"
+echo "  /tmp/setup_tunnel_$ID.sh monitor    # Monitorar continuamente"
+echo "  /tmp/setup_tunnel_$ID.sh help       # Mostrar ajuda completa"
 
-# Executar criação do túnel
+# Executar configuração inicial
 echo ""
-echo "🚀 Criando túnel SSH..."
-/tmp/setup_tunnel_$ID.sh create
+echo "🚀 Iniciando configuração inicial..."
+/tmp/setup_tunnel_$ID.sh configure
 ```
 
 > **📊 INTERPRETANDO O TÚNEL SSH:**
@@ -601,14 +812,10 @@ echo "🚀 Criando túnel SSH..."
 > ```
 > ✅ Túnel SSH criado com sucesso!
 > RedisInsight pode conectar em: localhost:6380
-> ✅ Conectividade OK (sem TLS)
-> ```
-> 
-> **Se houver TLS:**
-> ```
 > ✅ Conectividade OK (com TLS)
 > ⚠️ IMPORTANTE: Configure TLS no RedisInsight
 > ```
+> 
 > 
 > **Troubleshooting comum:**
 > - **"Permission denied":** Verifique chave SSH
@@ -788,11 +995,11 @@ echo "🛑 Para parar: kill $REDISINSIGHT_PID"
 
 > **🎨 CONFIGURAÇÃO VISUAL DETALHADA:**
 > 
-> **Analogia:** Agora vamos "ensinar" o RedisInsight onde encontrar nosso Redis. É como configurar GPS - precisamos dar o endereço correto (localhost:6380) para chegar ao destino (ElastiCache).
+> **Analogia:** Agora vamos "ensinar" o RedisInsight onde encontrar nosso Redis. É como configurar GPS - precisamos dar o endereço correto (localhost:porta_local) para chegar ao destino (ElastiCache).
 > 
 > **Informações necessárias:**
 > - **Host:** `localhost` (através do túnel SSH)
-> - **Port:** `6380` (porta local do túnel)
+> - **Port:** A porta local configurada no túnel (padrão: 6380)
 > - **TLS:** Depende da configuração do ElastiCache
 > - **Auth:** Geralmente não necessário para labs
 > 
@@ -803,30 +1010,32 @@ echo "🛑 Para parar: kill $REDISINSIGHT_PID"
 # Preparar informações para configuração visual
 echo "🎨 Preparando configuração do RedisInsight..."
 
-# Detectar se ElastiCache usa TLS
-echo "🔍 Detectando configuração de TLS..."
-TLS_REQUIRED="false"
-if redis-cli -h localhost -p 6380 ping >/dev/null 2>&1; then
-    echo "✅ Conexão sem TLS funcionando"
-    TLS_REQUIRED="false"
-elif redis-cli -h localhost -p 6380 --tls ping >/dev/null 2>&1; then
-    echo "✅ Conexão com TLS funcionando"
-    TLS_REQUIRED="true"
+# Obter configuração do túnel
+if [ -f ~/.ssh_tunnel_config ]; then
+    source ~/.ssh_tunnel_config
+    echo "✅ Configuração do túnel carregada"
 else
-    echo "❌ Nenhuma conexão funcionando - verificar túnel SSH"
-    TLS_REQUIRED="unknown"
+    echo "⚠️ Configuração do túnel não encontrada"
+    echo "Execute: /tmp/setup_tunnel_$ID.sh configure"
+    LOCAL_PORT="6380"  # Valor padrão
 fi
 
-# Obter informações do cluster
+# Verificar se túnel está ativo
+if lsof -Pi :${LOCAL_PORT:-6380} -sTCP:LISTEN -t >/dev/null 2>&1; then
+    TUNNEL_STATUS="✅ Ativo"
+else
+    TUNNEL_STATUS="❌ Inativo"
+fi
+
 echo ""
 echo "📋 Informações para configuração do RedisInsight:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🌐 URL do RedisInsight: http://localhost:$REDISINSIGHT_PORT"
 echo "🏠 Host: localhost"
-echo "🔌 Port: 6380"
-echo "🔐 TLS Required: $TLS_REQUIRED"
+echo "🔌 Port: ${LOCAL_PORT:-6380}"
+echo "� Status do Túnel: $TUNNEL_STATUS"
 echo "👤 Username: (deixar vazio)"
-echo "🔑 Password: (deixar vazio)"
+echo "�🔑 Password: (deixar vazio)"
 echo "🏷️ Database Alias: ElastiCache-Lab-$ID"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
@@ -834,9 +1043,9 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 cat > /tmp/redisinsight_config_$ID.json << EOF
 {
   "host": "localhost",
-  "port": 6380,
+  "port": ${LOCAL_PORT:-6380},
   "name": "ElastiCache-Lab-$ID",
-  "tls": $TLS_REQUIRED,
+  "tls": false,
   "username": "",
   "password": "",
   "timeout": 30000
@@ -850,45 +1059,51 @@ echo "📄 Configuração salva em: /tmp/redisinsight_config_$ID.json"
 echo ""
 echo "🎯 INSTRUÇÕES PASSO A PASSO:"
 echo ""
-echo "1️⃣ ACESSAR REDISINSIGHT:"
+echo "1️⃣ VERIFICAR TÚNEL SSH:"
+echo "   • Status do túnel: $TUNNEL_STATUS"
+if [[ "$TUNNEL_STATUS" == *"Inativo"* ]]; then
+    echo "   • ⚠️ IMPORTANTE: Túnel inativo! Execute:"
+    echo "     /tmp/setup_tunnel_$ID.sh create"
+fi
+echo ""
+echo "2️⃣ ACESSAR REDISINSIGHT:"
 echo "   • Abra navegador em: http://localhost:$REDISINSIGHT_PORT"
 echo "   • Aguarde carregar completamente"
 echo ""
-echo "2️⃣ PRIMEIRA CONFIGURAÇÃO (se for primeira vez):"
+echo "3️⃣ PRIMEIRA CONFIGURAÇÃO (se for primeira vez):"
 echo "   • Aceite os termos de uso"
 echo "   • Pule tutoriais opcionais (ou faça se quiser)"
 echo "   • Chegue na tela principal"
 echo ""
-echo "3️⃣ ADICIONAR DATABASE:"
+echo "4️⃣ ADICIONAR DATABASE:"
 echo "   • Clique em 'Add Redis Database' ou '+'"
 echo "   • Selecione 'Connect to a Redis Database'"
 echo ""
-echo "4️⃣ CONFIGURAR CONEXÃO:"
+echo "5️⃣ CONFIGURAR CONEXÃO:"
 echo "   • Connection Type: 'Standalone'"
 echo "   • Host: 'localhost'"
-echo "   • Port: '6380'"
+echo "   • Port: '${LOCAL_PORT:-6380}'"
 echo "   • Database Alias: 'ElastiCache-Lab-$ID'"
 echo "   • Username: (deixar vazio)"
 echo "   • Password: (deixar vazio)"
-
-if [ "$TLS_REQUIRED" = "true" ]; then
-    echo "   • ⚠️ IMPORTANTE: Marcar 'Use TLS'"
-    echo "   • TLS Settings: Use default settings"
-fi
-
+echo "   • TLS: Deixar desmarcado inicialmente"
 echo ""
-echo "5️⃣ TESTAR CONEXÃO:"
+echo "6️⃣ TESTAR CONEXÃO:"
 echo "   • Clique em 'Test Connection'"
-echo "   • Deve mostrar 'Connection Successful'"
-echo "   • Se falhar, verificar túnel SSH"
+echo "   • Se mostrar 'Connection Successful': ✅ Prossiga"
+echo "   • Se falhar com erro de TLS:"
+echo "     - Marque 'Use TLS'"
+echo "     - Teste novamente"
+echo "   • Se ainda falhar: Verificar túnel SSH"
 echo ""
-echo "6️⃣ SALVAR:"
+echo "7️⃣ SALVAR:"
 echo "   • Clique em 'Add Redis Database'"
 echo "   • Deve aparecer na lista de databases"
 echo ""
-echo "7️⃣ CONECTAR:"
+echo "8️⃣ CONECTAR:"
 echo "   • Clique no database criado"
 echo "   • Deve abrir o dashboard principal"
+echo "   • Você verá dados do cluster ElastiCache"
 echo ""
 
 # Verificações automáticas
@@ -896,66 +1111,110 @@ echo "🔧 VERIFICAÇÕES AUTOMÁTICAS:"
 echo ""
 
 # Verificar túnel SSH
-if lsof -Pi :6380 -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo "✅ Túnel SSH ativo na porta 6380"
+if lsof -Pi :${LOCAL_PORT:-6380} -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "✅ Túnel SSH ativo na porta ${LOCAL_PORT:-6380}"
 else
-    echo "❌ Túnel SSH não ativo - execute: /tmp/setup_tunnel_$ID.sh create"
+    echo "❌ Túnel SSH não ativo"
+    echo "   Solução: /tmp/setup_tunnel_$ID.sh create"
 fi
 
 # Verificar RedisInsight
-if check_redisinsight $REDISINSIGHT_PORT; then
+if curl -s http://localhost:$REDISINSIGHT_PORT/api/health >/dev/null 2>&1; then
     echo "✅ RedisInsight respondendo na porta $REDISINSIGHT_PORT"
 else
-    echo "❌ RedisInsight não responde - verificar logs: tail -f $REDISINSIGHT_LOG"
-fi
-
-# Verificar conectividade Redis
-if [ "$TLS_REQUIRED" = "true" ]; then
-    if redis-cli -h localhost -p 6380 --tls ping >/dev/null 2>&1; then
-        echo "✅ Redis acessível via TLS"
-    else
-        echo "❌ Redis não acessível via TLS"
-    fi
-elif [ "$TLS_REQUIRED" = "false" ]; then
-    if redis-cli -h localhost -p 6380 ping >/dev/null 2>&1; then
-        echo "✅ Redis acessível sem TLS"
-    else
-        echo "❌ Redis não acessível sem TLS"
-    fi
-else
-    echo "⚠️ Conectividade Redis não determinada"
+    echo "❌ RedisInsight não responde"
+    echo "   Solução: Verificar logs em $REDISINSIGHT_LOG"
 fi
 
 echo ""
-echo "🆘 TROUBLESHOOTING:"
-echo "• Túnel SSH inativo: /tmp/setup_tunnel_$ID.sh create"
-echo "• RedisInsight não responde: tail -f $REDISINSIGHT_LOG"
-echo "• Erro de TLS: Marcar/desmarcar 'Use TLS' no RedisInsight"
-echo "• Connection timeout: Verificar Security Groups"
-echo "• Port already in use: pkill -f redisinsight && reiniciar"
+echo "🆘 TROUBLESHOOTING COMUM:"
+echo ""
+echo "❌ 'Connection failed' no RedisInsight:"
+echo "   1. Verificar se túnel SSH está ativo:"
+echo "      /tmp/setup_tunnel_$ID.sh status"
+echo "   2. Se inativo, recriar túnel:"
+echo "      /tmp/setup_tunnel_$ID.sh create"
+echo "   3. Verificar porta no RedisInsight (deve ser ${LOCAL_PORT:-6380})"
+echo ""
+echo "❌ 'TLS connection error':"
+echo "   1. Primeiro tente SEM marcar 'Use TLS'"
+echo "   2. Se falhar, tente COM 'Use TLS' marcado"
+echo "   3. ElastiCache pode ter criptografia habilitada"
+echo ""
+echo "❌ 'Connection timeout':"
+echo "   1. Verificar Security Groups do ElastiCache"
+echo "   2. Verificar se Bastion Host tem acesso ao ElastiCache"
+echo "   3. Verificar se endpoint do ElastiCache está correto"
+echo ""
+echo "❌ 'Host unreachable':"
+echo "   1. Verificar se Bastion Host está acessível"
+echo "   2. Verificar chave SSH"
+echo "   3. Verificar IP do Bastion Host"
+echo ""
+echo "❌ RedisInsight não carrega:"
+echo "   1. Verificar se porta $REDISINSIGHT_PORT está livre"
+echo "   2. Verificar logs: tail -f $REDISINSIGHT_LOG"
+echo "   3. Tentar reiniciar RedisInsight"
+echo ""
+
+# Comandos úteis para troubleshooting
+echo "🛠️ COMANDOS ÚTEIS:"
+echo ""
+echo "# Verificar status completo:"
+echo "/tmp/setup_tunnel_$ID.sh status"
+echo ""
+echo "# Recriar túnel:"
+echo "/tmp/setup_tunnel_$ID.sh stop"
+echo "/tmp/setup_tunnel_$ID.sh create"
+echo ""
+echo "# Verificar processos na porta do túnel:"
+echo "lsof -Pi :${LOCAL_PORT:-6380} -sTCP:LISTEN"
+echo ""
+echo "# Verificar logs do RedisInsight:"
+echo "tail -f $REDISINSIGHT_LOG"
+echo ""
+echo "# Testar conectividade SSH manual:"
+echo "ssh -i ~/.ssh/id_rsa ec2-user@[BASTION_IP]"
 ```
 
 > **📊 INTERPRETANDO A CONFIGURAÇÃO:**
 > 
-> **Configuração bem-sucedida:**
+> **Configuração bem-sucedida no RedisInsight:**
 > ```
-> ✅ Túnel SSH ativo na porta 6380
-> ✅ RedisInsight respondendo na porta 8001
-> ✅ Redis acessível sem TLS
+> Test Connection: "Connection Successful" ✅
+> Database List: "ElastiCache-Lab-aluno01" aparece
+> Dashboard: Métricas e informações do cluster visíveis
 > ```
 > 
-> **No RedisInsight você deve ver:**
-> - **Test Connection:** "Connection Successful" ✅
-> - **Database List:** "ElastiCache-Lab-aluno01" aparece
-> - **Dashboard:** Métricas e informações do cluster
+> **Sinais de sucesso:**
+> - **Dashboard carrega:** Mostra informações do Redis
+> - **Browser funciona:** Lista chaves do cluster
+> - **Métricas aparecem:** CPU, memória, conexões
+> - **Comandos executam:** Workbench responde
 > 
-> **Problemas comuns e soluções:**
-> - **"Connection failed":** Verificar túnel SSH
-> - **"Timeout":** Verificar Security Groups
-> - **"TLS error":** Ajustar configuração TLS
-> - **"Host unreachable":** Verificar endpoint do ElastiCache
+> **Problemas comuns e diagnóstico:**
+> 
+> **"Connection failed":**
+> - **Causa mais comum:** Túnel SSH inativo
+> - **Diagnóstico:** `/tmp/setup_tunnel_$ID.sh status`
+> - **Solução:** `/tmp/setup_tunnel_$ID.sh create`
+> 
+> **"TLS connection error":**
+> - **Causa:** ElastiCache com criptografia habilitada
+> - **Solução:** Marcar "Use TLS" no RedisInsight
+> - **Alternativa:** Verificar configuração do cluster
+> 
+> **"Connection timeout":**
+> - **Causa:** Security Groups ou rede
+> - **Diagnóstico:** Verificar acesso do Bastion ao ElastiCache
+> - **Solução:** Ajustar Security Groups
+> 
+> **Interface não carrega:**
+> - **Causa:** RedisInsight não iniciou corretamente
+> - **Diagnóstico:** `curl http://localhost:8001/api/health`
+> - **Solução:** Verificar logs e reiniciar
 
-**✅ Checkpoint:** RedisInsight deve estar conectado e mostrando dados do cluster ElastiCache.
+**✅ Checkpoint:** RedisInsight deve estar conectado e mostrando dados do cluster ElastiCache através do túnel SSH.
 
 ---
 
