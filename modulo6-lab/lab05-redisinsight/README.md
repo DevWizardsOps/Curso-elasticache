@@ -82,14 +82,7 @@ Todos os recursos criados devem seguir o padrão:
 
 **Objetivo:** Criar cluster com dados interessantes para exploração visual
 
-#### Passo 1: Verificar Pré-requisitos
-
-```bash
-# Verificar se RedisInsight está instalado
-which redisinsight || echo "RedisInsight não encontrado - será instalado"
-```
-
-#### Passo 2: Criar Cluster para RedisInsight via Console Web
+#### Passo 1: Criar Cluster para RedisInsight via Console Web
 
 1. Acesse **ElastiCache** no Console AWS
 2. Na página inicial, selecione **"Caches do Redis OSS"** ← **IMPORTANTE**
@@ -178,9 +171,8 @@ echo "✅ Replication Group criado via CLI! Aguarde ~10-15 minutos para ficar di
 > - ✅ Failover automático (futuro)
 > 
 > **Regra prática:** Sempre use `create-replication-group` em produção!
-```
 
-#### Passo 3: Aguardar Criação e Obter Endpoint
+#### Passo 2: Aguardar Criação e Obter Endpoint
 
 ```bash
 # Monitorar criação
@@ -191,7 +183,7 @@ INSIGHT_ENDPOINT=$(aws elasticache describe-replication-groups --replication-gro
 echo "RedisInsight Cluster Endpoint: $INSIGHT_ENDPOINT"
 ```
 
-#### Passo 4: Popular com Dados Interessantes para Visualização
+#### Passo 3: Popular com Dados Interessantes para Visualização
 
 ```bash
 # Testar conectividade
