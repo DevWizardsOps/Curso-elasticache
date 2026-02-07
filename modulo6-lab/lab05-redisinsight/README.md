@@ -449,7 +449,7 @@ echo "Porta local: $LOCAL_PORT"
 echo "Porta Redis: $REDIS_PORT"
 
 # Criar script de túnel robusto e interativo
-cat > /tmp/setup_tunnel_$ID.sh << 'EOF'
+cat > /tmp/setup_tunnel_$ID.sh << 'SCRIPT_EOF'
 #!/bin/bash
 
 # Script de Túnel SSH para RedisInsight
@@ -486,10 +486,19 @@ ask_input() {
 # Função para verificar se túnel está ativo
 check_tunnel() {
     local port=$1
-    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-        return 0  # Túnel ativo
+    if command -v lsof >/dev/null 2>&1; then
+        if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+            return 0  # Túnel ativo
+        else
+            return 1  # Túnel inativo
+        fi
     else
-        return 1  # Túnel inativo
+        # Fallback se lsof não estiver disponível
+        if netstat -ln 2>/dev/null | grep ":$port " >/dev/null; then
+            return 0
+        else
+            return 1
+        fi
     fi
 }
 
@@ -532,14 +541,14 @@ configure_tunnel() {
     fi
     
     # Salvar configuração para reutilização
-    cat > ~/.ssh_tunnel_config << EOF
+    cat > ~/.ssh_tunnel_config << CONFIG_EOF
 LOCAL_PORT=$LOCAL_PORT
 ENDPOINT=$ENDPOINT
 BASTION_IP=$BASTION_IP
 BASTION_USER=$BASTION_USER
 SSH_KEY=$SSH_KEY
 REDIS_PORT=$REDIS_PORT
-EOF
+CONFIG_EOF
     
     print_success "Configuração salva em ~/.ssh_tunnel_config"
     return 0
@@ -578,13 +587,13 @@ validate_config() {
     fi
     
     # Verificar se ssh está disponível
-    if ! command -v ssh &> /dev/null; then
+    if ! command -v ssh >/dev/null 2>&1; then
         print_error "Comando 'ssh' não encontrado"
         errors=$((errors + 1))
     fi
     
     # Verificar se lsof está disponível
-    if ! command -v lsof &> /dev/null; then
+    if ! command -v lsof >/dev/null 2>&1; then
         print_warning "Comando 'lsof' não encontrado - verificação de porta limitada"
     fi
     
@@ -675,7 +684,7 @@ stop_tunnel() {
     fi
     
     # Matar processos usando a porta local
-    if command -v lsof &> /dev/null; then
+    if command -v lsof >/dev/null 2>&1; then
         local pids=$(lsof -ti:$LOCAL_PORT 2>/dev/null)
         if [ -n "$pids" ]; then
             echo $pids | xargs kill 2>/dev/null
@@ -688,7 +697,7 @@ stop_tunnel() {
         print_success "Túnel parado com sucesso"
     else
         print_warning "Túnel ainda pode estar ativo - verificar manualmente"
-        if command -v lsof &> /dev/null; then
+        if command -v lsof >/dev/null 2>&1; then
             print_info "Processos usando porta $LOCAL_PORT:"
             lsof -Pi :$LOCAL_PORT -sTCP:LISTEN 2>/dev/null || echo "Nenhum processo encontrado"
         fi
@@ -713,7 +722,7 @@ check_status() {
     if check_tunnel $LOCAL_PORT; then
         print_success "Túnel ativo na porta $LOCAL_PORT"
         
-        if command -v lsof &> /dev/null; then
+        if command -v lsof >/dev/null 2>&1; then
             print_info "Detalhes da conexão:"
             lsof -Pi :$LOCAL_PORT -sTCP:LISTEN 2>/dev/null
         fi
@@ -786,7 +795,7 @@ case "${1:-help}" in
         exit 1
         ;;
 esac
-EOF
+SCRIPT_EOF
 
 chmod +x /tmp/setup_tunnel_$ID.sh
 
